@@ -1,21 +1,20 @@
 import { createConfig, http, WagmiProvider } from "wagmi";
-import { base, degen, mainnet, optimism, unichain, celo } from "wagmi/chains";
+import { baseSepolia } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { farcasterFrame } from "@farcaster/miniapp-wagmi-connector";
 import { coinbaseWallet, metaMask } from 'wagmi/connectors';
-import { APP_NAME, APP_ICON_URL, APP_URL } from "~/lib/constants";
+import { APP_NAME, APP_ICON_URL, APP_URL } from "@/lib/constants";  // Sửa path: Thay ~ thành @
 import { useEffect, useState } from "react";
 import { useConnect, useAccount } from "wagmi";
 import React from "react";
 
-// Custom hook for Coinbase Wallet detection and auto-connection
+// Phát hiện Coinbase Wallet tự động
 function useCoinbaseWalletAutoConnect() {
   const [isCoinbaseWallet, setIsCoinbaseWallet] = useState(false);
   const { connect, connectors } = useConnect();
   const { isConnected } = useAccount();
 
   useEffect(() => {
-    // Check if we're running in Coinbase Wallet
     const checkCoinbaseWallet = () => {
       const isInCoinbaseWallet = window.ethereum?.isCoinbaseWallet || 
         window.ethereum?.isCoinbaseWalletExtension ||
@@ -32,7 +31,6 @@ function useCoinbaseWalletAutoConnect() {
   }, []);
 
   useEffect(() => {
-    // Auto-connect if in Coinbase Wallet and not already connected
     if (isCoinbaseWallet && !isConnected) {
       connect({ connector: connectors[1] }); // Coinbase Wallet connector
     }
@@ -42,14 +40,9 @@ function useCoinbaseWalletAutoConnect() {
 }
 
 export const config = createConfig({
-  chains: [base, optimism, mainnet, degen, unichain, celo],
+  chains: [baseSepolia],
   transports: {
-    [base.id]: http(),
-    [optimism.id]: http(),
-    [mainnet.id]: http(),
-    [degen.id]: http(),
-    [unichain.id]: http(),
-    [celo.id]: http(),
+    [baseSepolia.id]: http(),
   },
   connectors: [
     farcasterFrame(),
@@ -69,7 +62,6 @@ export const config = createConfig({
 
 const queryClient = new QueryClient();
 
-// Wrapper component that provides Coinbase Wallet auto-connection
 function CoinbaseWalletAutoConnect({ children }: { children: React.ReactNode }) {
   useCoinbaseWalletAutoConnect();
   return <>{children}</>;

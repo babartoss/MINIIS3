@@ -1,3 +1,4 @@
+// Wrapper localStorage an toàn
 export function setItem<T>(key: string, value: T) {
   try {
     localStorage.setItem(key, JSON.stringify(value));

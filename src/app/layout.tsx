@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
+import { getSession } from '@/auth';  // Sửa path: Thay ~ thành @
+import '@/app/globals.css';  // Giữ nguyên
+import { Providers } from '@/app/providers';
+import { APP_NAME, APP_DESCRIPTION } from '@/lib/constants';  // Sửa path: Thay ~ thành @
 
-import { getSession } from '~/auth';
-import '~/app/globals.css';
-import { Providers } from '~/app/providers';
-import { APP_NAME, APP_DESCRIPTION } from '~/lib/constants';
-
+// Metadata ứng dụng (thay title/description nếu cần)
 export const metadata: Metadata = {
   title: APP_NAME,
   description: APP_DESCRIPTION,
@@ -12,15 +12,15 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
-  const session = await getSession();
+}) {
+  const session = await getSession();  
 
   return (
     <html lang="en">
       <body>
-        <Providers session={session}>
+        <Providers session={session}>  
           {children}
         </Providers>
       </body>

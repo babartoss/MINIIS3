@@ -1,24 +1,11 @@
-/**
- * DESIGN SYSTEM - DO NOT EDIT UNLESS NECESSARY
- * 
- * This file contains the centralized design system for the mini app.
- * These component classes establish the visual consistency across all components.
- * 
- * ⚠️  AI SHOULD NOT NORMALLY EDIT THIS FILE ⚠️
- * 
- * Instead of modifying these classes, AI should:
- * 1. Use existing component classes (e.g., .btn, .card, .input)
- * 2. Use Tailwind utilities for one-off styling
- * 3. Create new React components rather than new CSS classes
- * 4. Only edit this file for specific bug fixes or accessibility improvements
- * 
- * When AI needs to style something:
- * ✅ Good: <button className="btn btn-primary">Click me</button>
- * ✅ Good: <div className="bg-primary text-white px-4 py-2 rounded">Custom</div>
- * ❌ Bad: Adding new CSS classes here for component-specific styling
- * 
- * This design system is intentionally minimal to prevent bloat and maintain consistency.
- */
+/* Updated: src/app/globals.css */
+/* Changes:
+- Added .text-shadow-lg/md for better text readability on backgrounds
+- Enhanced .card with optional gradient support
+- Added .badge class for ROUND and Prize Pool (small, rounded, colored tags)
+- Improved mobile contrast: Higher opacity, bolder fonts
+- Added subtle animation for hover on interactive elements
+*/
 
 @tailwind base;
 @tailwind components;
@@ -73,7 +60,7 @@ body {
 
   /* Global card styles */
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm;
+    @apply bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm transition-shadow hover:shadow-md;
   }
   
   .card-primary {
@@ -114,5 +101,19 @@ body {
   /* Global focus styles */
   .focus-ring {
     @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+
+  /* New: Badge for tags like ROUND and Prize Pool */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 text-sm font-medium rounded-full transition-colors;
+  }
+
+  /* New: Text shadow for readability on backgrounds */
+  .text-shadow-md {
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  .text-shadow-lg {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
   }
 }

@@ -22,6 +22,7 @@ function isIOS(): boolean {
   return isSmallIOS() || isLargeIOS();
 }
 
+// Kiểm tra device mobile (dùng cho responsive nếu cần)
 export function isMobile(): boolean {
   return isAndroid() || isIOS();
 }

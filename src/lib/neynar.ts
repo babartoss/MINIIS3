@@ -3,9 +3,7 @@ import { APP_URL } from './constants';
 
 let neynarClient: NeynarAPIClient | null = null;
 
-// Example usage:
-// const client = getNeynarClient();
-// const user = await client.lookupUserByFid(fid); 
+// Lấy client Neynar (thay API key trong .env nếu cần)
 export function getNeynarClient() {
   if (!neynarClient) {
     const apiKey = process.env.NEYNAR_API_KEY;
@@ -73,4 +71,4 @@ export async function sendNeynarMiniAppNotification({
   } catch (error) {
     return { state: "error", error };
   }
-} 
+}

@@ -3,11 +3,11 @@
 import '@farcaster/auth-kit/styles.css';
 import { useSignIn, UseSignInData } from '@farcaster/auth-kit';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { cn } from '~/lib/utils';
-import { Button } from '~/components/ui/Button';
-import { ProfileButton } from '~/components/ui/NeynarAuthButton/ProfileButton';
-import { AuthDialog } from '~/components/ui/NeynarAuthButton/AuthDialog';
-import { getItem, removeItem, setItem } from '~/lib/localStorage';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/Button';
+import { ProfileButton } from '@/components/ui/NeynarAuthButton/ProfileButton';
+import { AuthDialog } from '@/components/ui/NeynarAuthButton/AuthDialog';
+import { getItem, removeItem, setItem } from '@/lib/localStorage';
 import { useMiniApp } from '@neynar/react';
 import {
   signIn as backendSignIn,

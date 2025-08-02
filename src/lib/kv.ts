@@ -1,52 +1,25 @@
-import { MiniAppNotificationDetails } from '@farcaster/miniapp-sdk';
 import { Redis } from '@upstash/redis';
-import { APP_NAME } from './constants';
 
-// In-memory fallback storage
-const localStore = new Map<string, MiniAppNotificationDetails>();
+const redis = Redis.fromEnv();
 
-// Use Redis if KV env vars are present, otherwise use in-memory
-const useRedis = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
-const redis = useRedis
-  ? new Redis({
-      url: process.env.KV_REST_API_URL!,
-      token: process.env.KV_REST_API_TOKEN!,
-    })
-  : null;
+const PREFIX = 'miniis3:'; // Prefix để tránh conflict keys với project khác (IBSnoCT)
 
-function getUserNotificationDetailsKey(fid: number): string {
-  return `${APP_NAME}:user:${fid}`;
+export async function setUserNotificationDetails(fid: number, details: any) {
+  await redis.set(`${PREFIX}notification:${fid}`, JSON.stringify(details));
 }
 
-export async function getUserNotificationDetails(
-  fid: number
-): Promise<MiniAppNotificationDetails | null> {
-  const key = getUserNotificationDetailsKey(fid);
-  if (redis) {
-    return await redis.get<MiniAppNotificationDetails>(key);
-  }
-  return localStore.get(key) || null;
+export async function getUserNotificationDetails(fid: number) {
+  const data = await redis.get(`${PREFIX}notification:${fid}`);
+  return data ? JSON.parse(data as string) : null;
 }
 
-export async function setUserNotificationDetails(
-  fid: number,
-  notificationDetails: MiniAppNotificationDetails
-): Promise<void> {
-  const key = getUserNotificationDetailsKey(fid);
-  if (redis) {
-    await redis.set(key, notificationDetails);
-  } else {
-    localStore.set(key, notificationDetails);
-  }
+// Store address -> FID mapping
+export async function setAddressFid(address: string, fid: number) {
+  await redis.set(`${PREFIX}address_fid:${address.toLowerCase()}`, fid);
 }
 
-export async function deleteUserNotificationDetails(
-  fid: number
-): Promise<void> {
-  const key = getUserNotificationDetailsKey(fid);
-  if (redis) {
-    await redis.del(key);
-  } else {
-    localStore.delete(key);
-  }
+// Get FID by address
+export async function getFidByAddress(address: string): Promise<number | null> {
+  const fid = await redis.get(`${PREFIX}address_fid:${address.toLowerCase()}`);
+  return fid ? Number(fid) : null;
 }

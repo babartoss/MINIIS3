@@ -1,140 +1,63 @@
+// File: src/lib/constants.ts (Updated, no major changes but ensure APP_NAME)
 import { type AccountAssociation } from '@farcaster/miniapp-core/src/manifest';
 
-/**
- * Application constants and configuration values.
- *
- * This file contains all the configuration constants used throughout the mini app.
- * These values are either sourced from environment variables or hardcoded and provide
- * configuration for the app's appearance, behavior, and integration settings.
- *
- * NOTE: This file is automatically updated by the init script.
- * Manual changes may be overwritten during project initialization.
- */
-
-// --- App Configuration ---
-/**
- * The base URL of the application.
- * Used for generating absolute URLs for assets and API endpoints.
- */
+// URL cơ bản (thay NEXT_PUBLIC_URL trong .env nếu cần)
 export const APP_URL: string = process.env.NEXT_PUBLIC_URL!;
 
-/**
- * The name of the mini app as displayed to users.
- * Used in titles, headers, and app store listings.
- */
+// Tên app
 export const APP_NAME = 'MINIIS3';
 
-/**
- * A brief description of the mini app's functionality.
- * Used in app store listings and metadata.
- */
-export const APP_DESCRIPTION = 'A Farcaster mini app created with Neynar';
+// Mô tả app (đã chỉnh cho lottery)
+export const APP_DESCRIPTION = 'Mini lottery app on Farcaster, pick lucky numbers and win USDC';
 
-/**
- * The primary category for the mini app.
- * Used for app store categorization and discovery.
- */
+// Phân loại chính
 export const APP_PRIMARY_CATEGORY = 'games';
 
-/**
- * Tags associated with the mini app.
- * Used for search and discovery in app stores.
- */
+// Tags (đã chỉnh liên quan lottery)
 export const APP_TAGS = ['lottery', 'betting', 'lucky', 'draw', 'numbers', 'vietnam', 'crypto', 'farcaster', 'web3'];
 
-// --- Asset URLs ---
-/**
- * URL for the app's icon image.
- * Used in app store listings and UI elements.
- */
+// URL icon (thay nếu có icon custom)
 export const APP_ICON_URL: string = `${APP_URL}/icon.png`;
 
-/**
- * URL for the app's Open Graph image.
- * Used for social media sharing and previews.
- */
+// URL OG image (thay nếu cần)
 export const APP_OG_IMAGE_URL: string = `${APP_URL}/api/opengraph-image`;
 
-/**
- * URL for the app's splash screen image.
- * Displayed during app loading.
- */
+// URL splash (thay nếu cần)
 export const APP_SPLASH_URL: string = `${APP_URL}/splash.png`;
 
-/**
- * Background color for the splash screen.
- * Used as fallback when splash image is loading.
- */
+// Màu nền splash (thay nếu cần)
 export const APP_SPLASH_BACKGROUND_COLOR: string = '#f7f7f7';
 
-/**
- * Account association for the mini app.
- * Used to associate the mini app with a Farcaster account.
- * If not provided, the mini app will be unsigned and have limited capabilities.
- */
-export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined =
-  undefined;
+// Liên kết tài khoản
+export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined = undefined;
 
-// --- UI Configuration ---
-/**
- * Text displayed on the main action button.
- * Used for the primary call-to-action in the mini app.
- */
+// Text nút chính (true cho MINIIS3 vì dùng wallet cho contract)
 export const APP_BUTTON_TEXT = 'Try U Luck';
 
-// --- Integration Configuration ---
-/**
- * Webhook URL for receiving events from Neynar.
- *
- * If Neynar API key and client ID are configured, uses the official
- * Neynar webhook endpoint. Otherwise, falls back to a local webhook
- * endpoint for development and testing.
- */
+// URL webhook (tự động dùng Neynar nếu có API key)
 export const APP_WEBHOOK_URL: string =
   process.env.NEYNAR_API_KEY && process.env.NEYNAR_CLIENT_ID
     ? `https://api.neynar.com/f/app/${process.env.NEYNAR_CLIENT_ID}/event`
     : `${APP_URL}/api/webhook`;
 
-/**
- * Flag to enable/disable wallet functionality.
- *
- * When true, wallet-related components and features are rendered.
- * When false, wallet functionality is completely hidden from the UI.
- * Useful for mini apps that don't require wallet integration.
- */
+// Bật/tắt wallet (true cho MINIIS3 vì dùng wallet cho contract)
 export const USE_WALLET = true;
 
-/**
- * Flag to enable/disable analytics tracking.
- *
- * When true, usage analytics are collected and sent to Neynar.
- * When false, analytics collection is disabled.
- * Useful for privacy-conscious users or development environments.
- */
+// Bật/tắt analytics
 export const ANALYTICS_ENABLED = false;
 
-/**
- * Required chains for the mini app.
- *
- * Contains an array of CAIP-2 identifiers for blockchains that the mini app requires.
- * If the host does not support all chains listed here, it will not render the mini app.
- * If empty or undefined, the mini app will be rendered regardless of chain support.
- *
- * Supported chains: eip155:1, eip155:137, eip155:42161, eip155:10, eip155:8453,
- * solana:mainnet, solana:devnet
- */
-export const APP_REQUIRED_CHAINS: string[] = [];
+// Chain yêu cầu (true cho MINIIS3 vì dùng wallet cho contract)
+export const APP_REQUIRED_CHAINS: string[] = ['eip155:84532'];  // Base Sepolia testnet, thay nếu mainnet
 
-// PLEASE DO NOT UPDATE THIS
+// Không thay đổi (EIP-712 cho signed key)
 export const SIGNED_KEY_REQUEST_VALIDATOR_EIP_712_DOMAIN = {
   name: 'Farcaster SignedKeyRequestValidator',
   version: '1',
   chainId: 10,
-  verifyingContract:
-    '0x00000000fc700472606ed4fa22623acf62c60553' as `0x${string}`,
+  verifyingContract: '0x00000000fc700472606ed4fa22623acf62c60553' as `0x${string}`,
 };
 
-// PLEASE DO NOT UPDATE THIS
+// Không thay đổi (type cho signed key)
 export const SIGNED_KEY_REQUEST_TYPE = [
   { name: 'requestFid', type: 'uint256' },
   { name: 'key', type: 'bytes' },

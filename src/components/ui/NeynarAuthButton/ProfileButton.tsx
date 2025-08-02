@@ -1,8 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useDetectClickOutside } from '~/hooks/useDetectClickOutside';
-import { cn } from '~/lib/utils';
+import { useDetectClickOutside } from '@/hooks/useDetectClickOutside';
+import { cn } from '@/lib/utils';
 
 export function ProfileButton({
   userData,

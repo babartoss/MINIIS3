@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { SignIn as SignInCore } from '@farcaster/miniapp-sdk';
-import { useQuickAuth } from '~/hooks/useQuickAuth';
+import { useQuickAuth } from '@/hooks/useQuickAuth';
 import { Button } from '../Button';
 
 /**

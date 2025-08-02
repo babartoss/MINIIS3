@@ -5,11 +5,10 @@ import type { Session } from 'next-auth';
 import { SessionProvider } from 'next-auth/react';
 import { AuthKitProvider } from '@farcaster/auth-kit';
 import { MiniAppProvider } from '@neynar/react';
-import { SafeFarcasterSolanaProvider } from '~/components/providers/SafeFarcasterSolanaProvider';
-import { ANALYTICS_ENABLED } from '~/lib/constants';
+import { ANALYTICS_ENABLED } from '@/lib/constants';
 
 const WagmiProvider = dynamic(
-  () => import('~/components/providers/WagmiProvider'),
+  () => import('@/components/providers/WagmiProvider'),
   {
     ssr: false,
   }
@@ -22,8 +21,6 @@ export function Providers({
   session: Session | null;
   children: React.ReactNode;
 }) {
-  const solanaEndpoint =
-    process.env.SOLANA_RPC_ENDPOINT || 'https://solana-rpc.publicnode.com';
   return (
     <SessionProvider session={session}>
       <WagmiProvider>
@@ -31,11 +28,9 @@ export function Providers({
           analyticsEnabled={ANALYTICS_ENABLED}
           backButtonEnabled={true}
         >
-          <SafeFarcasterSolanaProvider endpoint={solanaEndpoint}>
-            <AuthKitProvider config={{}}>
-              {children}
-            </AuthKitProvider>
-          </SafeFarcasterSolanaProvider>
+          <AuthKitProvider config={{}}>
+            {children}
+          </AuthKitProvider>
         </MiniAppProvider>
       </WagmiProvider>
     </SessionProvider>

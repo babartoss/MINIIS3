@@ -14,6 +14,7 @@ type SendMiniAppNotificationResult =
   | { state: "rate_limit" }
   | { state: "success" };
 
+// Gửi notification miniapp (dùng KV hoặc local)
 export async function sendMiniAppNotification({
   fid,
   title,
@@ -47,18 +48,15 @@ export async function sendMiniAppNotification({
   if (response.status === 200) {
     const responseBody = sendNotificationResponseSchema.safeParse(responseJson);
     if (responseBody.success === false) {
-      // Malformed response
       return { state: "error", error: responseBody.error.errors };
     }
 
     if (responseBody.data.result.rateLimitedTokens.length) {
-      // Rate limited
       return { state: "rate_limit" };
     }
 
     return { state: "success" };
   } else {
-    // Error response
     return { state: "error", error: responseJson };
   }
 }

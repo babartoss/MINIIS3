@@ -215,7 +215,7 @@ function getDomainFromUrl(urlString: string | undefined): string {
 }
 
 export const authOptions: AuthOptions = {
-  // Configure one or more authentication providers
+  // Cấu hình providers (thay API key nếu cần)
   providers: [
     CredentialsProvider({
       id: 'neynar',
@@ -260,12 +260,9 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
-        // For Neynar, we can use a different validation approach
-        // This could involve validating against Neynar's API or using their SDK
         try {
-          // Validate the signature using Farcaster's auth client (same as Farcaster provider)
+          // Khởi tạo appClient (thay RPC URL nếu cần để tránh error 401)
           const appClient = createAppClient({
-            // USE your own RPC URL or else you might get 401 error
             ethereum: viemConnector(),
           });
 
@@ -291,7 +288,6 @@ export const authOptions: AuthOptions = {
             return null;
           }
 
-          // Validate that the provided FID matches the verified FID
           if (credentials?.fid && parseInt(credentials.fid) !== fid) {
             console.error('FID mismatch in Neynar auth');
             return null;
@@ -314,11 +310,9 @@ export const authOptions: AuthOptions = {
   ],
   callbacks: {
     session: async ({ session, token }) => {
-      // Set provider at the root level
       session.provider = token.provider as string;
 
       if (token.provider === 'neynar') {
-        // For Neynar, use full user data structure from user
         session.user = token.user as typeof session.user;
         session.signers = token.signers as typeof session.signers;
       }

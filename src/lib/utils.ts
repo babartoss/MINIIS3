@@ -16,10 +16,12 @@ import {
   APP_ACCOUNT_ASSOCIATION,
 } from './constants';
 
+// Hàm kết hợp class Tailwind
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Metadata cho embed miniapp (thay ogImageUrl nếu cần custom)
 export function getMiniAppEmbedMetadata(ogImageUrl?: string) {
   return {
     version: 'next',
@@ -44,6 +46,7 @@ export function getMiniAppEmbedMetadata(ogImageUrl?: string) {
   };
 }
 
+// Manifest cho Farcaster domain
 export async function getFarcasterDomainManifest(): Promise<Manifest> {
   return {
     accountAssociation: APP_ACCOUNT_ASSOCIATION!,

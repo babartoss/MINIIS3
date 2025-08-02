@@ -1,10 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { APP_NAME } from "~/lib/constants";
+import { APP_NAME } from "@/lib/constants";  // Đã sửa path
 
-// note: dynamic import is required for components that use the Frame SDK
-const AppComponent = dynamic(() => import("~/components/App"), {
+// Dynamic import để tránh SSR issue với Frame SDK
+const AppComponent = dynamic(() => import("@/components/App"), {  // Thay ~ thành @
   ssr: false,
 });
 
