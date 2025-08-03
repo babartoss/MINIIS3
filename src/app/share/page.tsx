@@ -1,24 +1,27 @@
-// Modified: src/app/share/page.tsx
-// Changes:
-// - Removed contract from imageUrl, pageUrl, and description
-
 import { Metadata, ResolvingMetadata } from 'next';
 import ClientSharePage from './ClientSharePage';
 
 type Props = {
-  params: Promise<{}>;
+  params: Promise<Record<string, unknown>>;
   searchParams: Promise<Record<string, string | string[]>>;
 }
+
+const getParam = (param: string | string[] | undefined): string => {
+  if (Array.isArray(param)) {
+    return param[0] || '';
+  }
+  return param || '';
+};
 
 export async function generateMetadata(
   { searchParams }: Props,
   _parent: ResolvingMetadata
 ): Promise<Metadata> {
   const searchParamsResolved = await searchParams;
-  const number = searchParamsResolved.number || '00';
-  const round = searchParamsResolved.round || '1';
-  const player = searchParamsResolved.player || '';
-  const txHash = searchParamsResolved.txHash || '';
+  const number = getParam(searchParamsResolved.number) || '00';
+  const round = getParam(searchParamsResolved.round) || '1';
+  const player = getParam(searchParamsResolved.player);
+  const txHash = getParam(searchParamsResolved.txHash);
   const appUrl = process.env.NEXT_PUBLIC_URL || 'https://your-app-url.vercel.app';
   const imageUrl = `${appUrl}/api/ticket-image?number=${number}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;
   const pageUrl = `${appUrl}/share?number=${number}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;

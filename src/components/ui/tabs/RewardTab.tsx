@@ -33,7 +33,7 @@ export function RewardTab() {
         if (await contract.roundClosed(round)) {
           const wNums = await contract.winningNumbers(round);
           let matches = 0;
-          let winnersSet = new Set<string>(); // To count unique winners
+          const winnersSet = new Set<string>(); // To count unique winners
           for (let i = 0; i < 100; i++) {
             const selector = await contract.selectedNumbers(round, i);
             if (selector !== ethers.ZeroAddress) {

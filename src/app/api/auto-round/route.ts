@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import axios from "axios";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 import { sendNeynarMiniAppNotification } from "~/lib/neynar";
 import { getFidByAddress } from "~/lib/kv";
 
@@ -243,7 +243,13 @@ async function fetchWinningNumbers() {
     const numbers = [...g7Numbers.slice(0, 4), dbNumber].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n < 100);
     return numbers;
   } catch (error) {
-    console.error('Error fetching winners:', error.message);
+    let message = 'Unknown error';
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (typeof error === 'string') {
+      message = error;
+    }
+    console.error('Error fetching winners:', message);
     return [];
   }
 }
@@ -309,7 +315,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in auto-round:', error);
+    let message = 'Unknown error';
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (typeof error === 'string') {
+      message = error;
+    }
+    console.error('Error in auto-round:', message);
     return NextResponse.json({ error: 'Failed to run auto-round' }, { status: 500 });
   }
 }

@@ -5,10 +5,7 @@ import {
 } from "@farcaster/miniapp-node";
 import { NextRequest } from "next/server";
 import { APP_NAME } from "~/lib/constants";
-import {
-  deleteUserNotificationDetails,
-  setUserNotificationDetails,
-} from "~/lib/kv";
+import { setUserNotificationDetails } from "~/lib/kv";
 import { sendMiniAppNotification } from "~/lib/notifs";
 
 export async function POST(request: NextRequest) {
@@ -56,7 +53,7 @@ export async function POST(request: NextRequest) {
   // Only handle notifications if Neynar is not enabled
   // When Neynar is enabled, notifications are handled through their webhook
   switch (event.event) {
-    case "frame_added":
+    case "miniapp_added":
       if (event.notificationDetails) {
         await setUserNotificationDetails(fid, event.notificationDetails);
         await sendMiniAppNotification({
@@ -65,12 +62,12 @@ export async function POST(request: NextRequest) {
           body: "Mini app is now added to your client",
         });
       } else {
-        await deleteUserNotificationDetails(fid);
+        await setUserNotificationDetails(fid, null);
       }
       break;
 
-    case "frame_removed":
-      await deleteUserNotificationDetails(fid);
+    case "miniapp_removed":
+      await setUserNotificationDetails(fid, null);
       break;
 
     case "notifications_enabled":
@@ -83,7 +80,7 @@ export async function POST(request: NextRequest) {
       break;
 
     case "notifications_disabled":
-      await deleteUserNotificationDetails(fid);
+      await setUserNotificationDetails(fid, null);
       break;
   }
 

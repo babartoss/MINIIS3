@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { useAccount, useContractWrite } from 'wagmi';
-import { useAuthKit } from '@farcaster/auth-kit'; // Import để lấy FID từ Farcaster (dựa trên package.json)
+import { useAccount, useWriteContract } from 'wagmi';
+import { useSignIn } from '@farcaster/auth-kit'; // Correct import for getting user data
 import ApproveModal from './ApproveModal';
 import ShareModal from './ShareModal';
 
 const Board: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
-  const { userData } = useAuthKit(); // Lấy FID từ Farcaster auth-kit
+  const { data: userData } = useSignIn({}); // Use useSignIn to get user data
   const fid = userData?.fid; // FID của user hiện tại
 
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
@@ -18,11 +18,14 @@ const Board: React.FC = () => {
   const [selectedNumbers, setSelectedNumbers] = useState<Set<number>>(new Set());
   const numbers = Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'));
 
-  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
-  const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS || '';
+  const contractAddress = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '') as `0x${string}`;
+  const usdcAddress = (process.env.NEXT_PUBLIC_USDC_ADDRESS || '') as `0x${string}`;
   const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://sepolia.base.org';
   const betCloseStart = parseInt(process.env.NEXT_PUBLIC_BET_CLOSE_START_HOUR || '11');
   const betCloseEnd = parseInt(process.env.NEXT_PUBLIC_BET_CLOSE_END_HOUR || '12');
+
+  const { writeContractAsync: selectNumAsync } = useWriteContract();
+  const { writeContractAsync: approveUSDCAsync } = useWriteContract();
 
   useEffect(() => {
     const checkClosingTime = () => {
@@ -34,7 +37,7 @@ const Board: React.FC = () => {
     checkClosingTime();
     const interval = setInterval(checkClosingTime, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [betCloseStart, betCloseEnd]);
 
   useEffect(() => {
     const fetchSelected = async () => {
@@ -63,14 +66,34 @@ const Board: React.FC = () => {
     setShowApprove(true);
   };
 
-  const { write: selectNum, isLoading: isSelecting } = useContractWrite({
-    address: contractAddress,
-    abi: ['function selectNumber(uint8)'],
-    functionName: 'selectNumber',
-    args: [selectedNumber],
-    enabled: !!userAddress && !!selectedNumber,
-    onSuccess: async (data) => {
-      setTxHash(data.hash);
+  const handleConfirm = async () => {
+    if (isBetClosed || !selectedNumber || !userAddress) return;
+
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const usdcContract = new ethers.Contract(usdcAddress, [
+      'function allowance(address owner, address spender) view returns (uint256)'
+    ], provider);
+    const allowance = await usdcContract.allowance(userAddress, contractAddress);
+
+    try {
+      if (allowance < BigInt(10000)) {
+        const approveHash = await approveUSDCAsync({
+          address: usdcAddress,
+          abi: ['function approve(address spender, uint256 amount) public returns (bool)'],
+          functionName: 'approve',
+          args: [contractAddress, BigInt(10000)],
+        });
+        console.log('Approve tx hash:', approveHash);
+      }
+
+      const selectHash = await selectNumAsync({
+        address: contractAddress,
+        abi: ['function selectNumber(uint8)'],
+        functionName: 'selectNumber',
+        args: [selectedNumber],
+      });
+
+      setTxHash(selectHash);
       setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
       setShowApprove(false);
       setShowShare(true);
@@ -88,33 +111,8 @@ const Board: React.FC = () => {
           console.error('Error recording mapping:', error);
         }
       }
-    },
-  });
-
-  const { write: approveUSDC, isLoading: isApproving } = useContractWrite({
-    address: usdcAddress,
-    abi: ['function approve(address spender, uint256 amount) public returns (bool)'],
-    functionName: 'approve',
-    args: [contractAddress, BigInt(10000)],
-    enabled: !!userAddress && !!selectedNumber,
-    onSuccess: () => {
-      if (selectNum) selectNum();
-    },
-  });
-
-  const handleConfirm = async () => {
-    if (isBetClosed || !selectedNumber || !userAddress) return;
-
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const usdcContract = new ethers.Contract(usdcAddress, [
-      'function allowance(address owner, address spender) view returns (uint256)'
-    ], provider);
-    const allowance = await usdcContract.allowance(userAddress, contractAddress);
-
-    if (allowance < BigInt(10000)) {
-      if (approveUSDC) approveUSDC();
-    } else {
-      if (selectNum) selectNum();
+    } catch (error) {
+      console.error('Transaction failed:', error);
     }
   };
 

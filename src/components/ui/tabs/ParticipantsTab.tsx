@@ -22,19 +22,22 @@ export function ParticipantsTab() {
       const fromBlock = latestBlock - 50000; // ~1-2 days, covers full round
       const filter = contract.filters.NumberSelected(null);
       const events = await contract.queryFilter(filter, fromBlock, 'latest');
-      const parts = await Promise.all(events.map(async (event) => {
-        if (event.args && event.args[0] !== currentRound) return null; // Manual filter by round
+      const partsPromises = events.map(async (event) => {
+        const parsedLog = contract.interface.parseLog(event);
+        if (!parsedLog || parsedLog.args[0] !== currentRound) return null; // Manual filter by round
         const block = await provider.getBlock(event.blockNumber);
-        const timestamp = new Date(block?.timestamp! * 1000).toLocaleString(); // Format nicer: local time
+        if (!block || !block.timestamp) return null; // Safely handle if block or timestamp is null/undefined
+        const timestamp = new Date(block.timestamp * 1000).toLocaleString(); // Format nicer: local time
         return {
-          number: event.args![2].toString().padStart(2, '0'),
-          user: truncateAddress(event.args![1]), // Truncate user address for brevity (add truncate function if needed)
+          number: parsedLog.args[2].toString().padStart(2, '0'),
+          user: truncateAddress(parsedLog.args[1]), // Truncate user address for brevity (add truncate function if needed)
           timestamp,
         };
-      }).filter(Boolean)); // Remove nulls
+      });
+      const parts = (await Promise.all(partsPromises)).filter(Boolean) as { number: string; user: string; timestamp: string }[]; // Remove nulls
       // Sort by number ascending
       parts.sort((a, b) => parseInt(a.number) - parseInt(b.number));
-      setParticipants(parts as { number: string; user: string; timestamp: string }[]);
+      setParticipants(parts);
     };
 
     fetchParticipants();
@@ -56,7 +59,7 @@ export function ParticipantsTab() {
 
   return (
     <div className="mx-4 overflow-x-auto"> {/* Responsive scroll if needed */}
-      <h2 className="text-lg font-semibold mb-4 text-center">Today's Participants</h2>
+      <h2 className="text-lg font-semibold mb-4 text-center">Today&apos;s Participants</h2>
       <table className="table-auto w-full bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md border-collapse">
         <thead>
           <tr className="bg-primary text-white">

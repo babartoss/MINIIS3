@@ -37,8 +37,8 @@ const Results: React.FC = () => {
         const g7Numbers = g7Element.textContent?.trim().split(' - ') || [];
         const numbers = [...g7Numbers, dbNumber].slice(0, 5);
         setWinningNumbers(numbers);
-        const table = document.querySelector('#box_kqxs_minhngoc table');
-        if (table) table.style.display = 'none';
+        const table = document.querySelector('#box_kqxs_minhngoc table') as HTMLElement;
+	  if (table) table.style.display = 'none';
       }
       setIsLoading(false); // Stop loading after data is set
     };
@@ -47,10 +47,10 @@ const Results: React.FC = () => {
     // Check time for labels and loading
     const checkTime = () => {
       const now = new Date();
-      let targetStart = new Date(now);
+      const targetStart = new Date(now);
       targetStart.setUTCHours(resultHour, resultMinute, 0, 0); // 11:15 UTC
 
-      let targetComplete = new Date(now);
+      const targetComplete = new Date(now);
       targetComplete.setUTCHours(resultHour, resultMinute + 15, 0, 0); // 11:30 UTC
 
       if (now >= targetStart && now < targetComplete) {
@@ -67,7 +67,7 @@ const Results: React.FC = () => {
     // Countdown to result start time UTC
     const updateCountdown = () => {
       const now = new Date();
-      let target = new Date(now);
+      const target = new Date(now);
       target.setUTCHours(resultHour, resultMinute, 0, 0);
       if (now > target) {
         target.setUTCDate(target.getUTCDate() + 1); // Next day if passed
@@ -90,7 +90,7 @@ const Results: React.FC = () => {
       clearInterval(countdownInterval);
       clearInterval(timeInterval);
     };
-  }, []);
+  }, [resultHour, resultMinute]);
 
   return (
     <div className="mb-4">

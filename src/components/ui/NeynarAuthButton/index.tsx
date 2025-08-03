@@ -463,7 +463,13 @@ export function NeynarAuthButton() {
       message &&
       signature &&
       !isSignerFlowRunning &&
-      !signerFlowStartedRef.current
+      !signerFlowStartedRef.current &&
+      context?.client &&
+      createSigner &&
+      fetchAllSigners &&
+      generateSignedKeyRequest &&
+      startPolling &&
+      useBackendFlow
     ) {
       signerFlowStartedRef.current = true;
 
@@ -536,7 +542,17 @@ export function NeynarAuthButton() {
 
       handleSignerFlow();
     }
-  }, [message, signature]); // Simplified dependencies
+  }, [
+    message, 
+    signature, 
+    isSignerFlowRunning,
+    context?.client,
+    createSigner,
+    fetchAllSigners,
+    generateSignedKeyRequest,
+    startPolling,
+    useBackendFlow
+  ]); // Simplified dependencies
 
   // Backend flow using NextAuth
   const handleBackendSignIn = useCallback(async () => {

@@ -18,11 +18,11 @@ export enum Tab {
 }
 
 export interface AppProps {
-  title?: string;
+  _title?: string;
 }
 
 export default function App(
-  { title }: AppProps = { title: "Hello MINIIS3" }
+  { _title }: AppProps = { _title: "Hello MINIIS3" }
 ) {
   const {
     isSDKLoaded,
