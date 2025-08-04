@@ -1,5 +1,6 @@
 // Updated: src/components/Header.tsx
 // Changes:
+// - Fixed syntax error by removing inline comment causing JSX parsing issue (moved to code comment above).
 // - Adopted mobile-first approach: Default to flex-col for stacking elements vertically on small screens to prevent overlapping.
 // - On sm+ screens: Switch to flex-row with justify-between for horizontal layout.
 // - Integrated avatar into the flex flow as relative (not absolute) on mobile, positioned at the end; on sm+ use absolute for corner placement.
@@ -83,7 +84,7 @@ export function Header({ neynarUser }: HeaderProps) {
         </div>
         {context?.user && (
           <div 
-            className="self-end sm:absolute sm:top-3 sm:right-3 cursor-pointer z-20 hover:scale-105 transition-transform"  {/* Relative on mobile, absolute on sm+ */}
+            className="self-end sm:absolute sm:top-3 sm:right-3 cursor-pointer z-20 hover:scale-105 transition-transform" // Relative on mobile, absolute on sm+
             onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
           >
             {context.user.pfpUrl && (
