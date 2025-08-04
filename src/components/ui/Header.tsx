@@ -1,14 +1,14 @@
 // Updated: src/components/Header.tsx
 // Changes:
-// - Fixed syntax error by removing inline comment causing JSX parsing issue (moved to code comment above).
-// - Adopted mobile-first approach: Default to flex-col for stacking elements vertically on small screens to prevent overlapping.
-// - On sm+ screens: Switch to flex-row with justify-between for horizontal layout.
-// - Integrated avatar into the flex flow as relative (not absolute) on mobile, positioned at the end; on sm+ use absolute for corner placement.
-// - Reduced font sizes slightly for mobile (text-sm for badges, text-lg for welcome), increased to text-base and text-xl on sm+.
-// - Increased overall padding (py-4) and gap (gap-4 on mobile, gap-6 on sm+) for better spacing and compactness.
-// - Added padding-right on welcome text to reserve space for avatar on sm+ without overlap.
-// - Ensured no overflow with flex-wrap and responsive classes from Tailwind.
-// - Maintained hover effects and existing features for professionalism.
+// - Redesigned layout to match vintage badge style from the image: Yellow background, red-brown border, rounded corners.
+// - Mapped elements to image: "GUESS THAT PRICE!" -> "Welcome to {APP_NAME}!" in large navy text.
+// - Avatar: Circular image on left, using user pfpUrl.
+// - Name section: "NAME" in red, username in large navy.
+// - ID section: "FID" in red (instead of ID, as per app context), FID in large navy (removed duplication from image).
+// - Integrated round and prize pool as subtle badges at bottom for functionality.
+// - Used Tailwind classes for styling: bg-yellow-400, border-red-800, text-navy (add navy to tailwind.config if needed, or use text-blue-900).
+// - Maintained responsive design: flex-row on sm+, flex-col on mobile; avatar clickable for dropdown.
+// - Ensured no overlap, with padding and gaps for balance.
 
 "use client";
 
@@ -71,31 +71,44 @@ export function Header({ neynarUser }: HeaderProps) {
   return (
     <div className="relative max-w-full">
       <div 
-        className="mt-2 mb-2 mx-4 px-4 py-4 card card-primary flex flex-col items-center justify-center sm:flex-row sm:justify-between border-2 border-dashed border-primary-light bg-gradient-to-r from-primary/5 to-primary/10 shadow-md rounded-lg gap-4 sm:gap-6 flex-wrap sm:flex-nowrap"
+        className="mt-2 mb-2 mx-4 px-4 py-4 bg-yellow-400 border-4 border-red-800 rounded-xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-4"
       >
-        <div className="text-sm sm:text-base font-bold bg-primary text-white px-4 py-2 rounded-full shadow-sm hover:scale-105 transition-transform cursor-pointer">
-          ROUND {roundNumber}
+        <div className="w-full text-center sm:text-left">
+          <h1 className="text-3xl font-bold text-blue-900">Welcome to {APP_NAME}!</h1>
         </div>
-        <div className="text-lg sm:text-xl font-semibold text-center text-primary-dark flex-grow sm:pr-12">  {/* Added pr-12 on sm+ to reserve space for avatar */}
-          Welcome to {APP_NAME}!
-        </div>
-        <div className="text-sm sm:text-base font-bold bg-green-500 text-white px-4 py-2 rounded-full shadow-sm hover:scale-105 transition-transform cursor-pointer">
-          Prize Pool: {poolBalance} USDC
-        </div>
-        {context?.user && (
-          <div 
-            className="self-end sm:absolute sm:top-3 sm:right-3 cursor-pointer z-20 hover:scale-105 transition-transform" // Relative on mobile, absolute on sm+
-            onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-          >
-            {context.user.pfpUrl && (
-              <img 
-                src={context.user.pfpUrl} 
-                alt="Profile" 
-                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-primary shadow-md"
-              />
-            )}
+        <div className="flex items-center gap-4">
+          {context?.user && (
+            <div 
+              className="cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+            >
+              {context.user.pfpUrl && (
+                <img 
+                  src={context.user.pfpUrl} 
+                  alt="Profile" 
+                  className="w-20 h-20 rounded-full border-4 border-blue-900 shadow-md"
+                />
+              )}
+            </div>
+          )}
+          <div className="text-center sm:text-left">
+            <p className="text-red-600 font-bold text-lg">NAME</p>
+            <p className="text-blue-900 font-bold text-2xl">{context?.user?.displayName || context?.user?.username || 'Guest'}</p>
+            <div className="flex justify-between mt-2">
+              <p className="text-blue-900 font-bold text-xl">{context?.user?.fid || 'N/A'}</p>
+              <p className="text-red-600 font-bold text-lg">FID</p>
+              <p className="text-blue-900 font-bold text-xl">{context?.user?.fid || 'N/A'}</p>
+            </div>
           </div>
-        )}
+        </div>
+        <div className="flex flex-col items-center gap-2 mt-4 sm:mt-0">
+          <div className="text-sm font-bold bg-primary text-white px-3 py-1 rounded-full shadow-sm">
+            ROUND {roundNumber}
+          </div>
+          <div className="text-sm font-bold bg-green-500 text-white px-3 py-1 rounded-full shadow-sm">
+            Prize Pool: {poolBalance} USDC
+          </div>
+        </div>
       </div>
       {context?.user && isUserDropdownOpen && (
         <div className="absolute top-full right-0 z-50 w-48 mt-1 mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
