@@ -1,10 +1,13 @@
 // Updated: src/components/Header.tsx
 // Changes:
-// - Removed countdown functionality and display completely
-// - Adjusted overall frame: Reduced padding (py-3 to py-2), margin-bottom (mb-4 to mb-2), made container more compact
-// - Balanced layout: Changed flex-col to flex-row for main content, centered items, reduced font sizes (text-lg to text-md for Welcome)
-// - Kept badges small and rounded, ensured mobile-friendly with max-w-full and flex-wrap
-// - Maintained existing features (poolBalance fetch, user dropdown)
+// - Enhanced overall layout for better balance and professionalism: Increased padding to py-3 for more vertical space, used gap-4 for consistent spacing between elements.
+// - Improved alignment: Ensured all elements are centered vertically with items-center, and used justify-between for even distribution.
+// - Enlarged user avatar from w-6 h-6 to w-8 h-8 for better visibility.
+// - Adjusted avatar position from top-1 right-1 to top-2 right-2 to ensure it sits comfortably inside the border without overflowing.
+// - Refined text sizes: Welcome message to text-lg for prominence, badges to text-base for consistency.
+// - Added subtle hover effects on badges and avatar for improved interactivity and professional feel.
+// - Ensured responsiveness with flex-wrap and max-w-full on the container.
+// - Maintained existing features like poolBalance fetching and user dropdown.
 
 "use client";
 
@@ -65,29 +68,29 @@ export function Header({ neynarUser }: HeaderProps) {
   }, [contractAddress, rpcUrl]);
 
   return (
-    <div className="relative">
+    <div className="relative max-w-full">
       <div 
-        className="mt-2 mb-2 mx-4 px-3 py-2 card card-primary flex flex-row items-center justify-between border-2 border-dashed border-primary-light bg-gradient-to-r from-primary/5 to-primary/10 shadow-md flex-wrap gap-2"
+        className="mt-2 mb-2 mx-4 px-4 py-3 card card-primary flex flex-row items-center justify-between border-2 border-dashed border-primary-light bg-gradient-to-r from-primary/5 to-primary/10 shadow-md rounded-lg flex-wrap gap-4"
       >
-        <div className="text-sm font-bold bg-primary text-white px-3 py-1 rounded-full shadow-sm">
+        <div className="text-base font-bold bg-primary text-white px-4 py-2 rounded-full shadow-sm hover:shadow-md transition-shadow">
           ROUND {roundNumber}
         </div>
-        <div className="text-md font-semibold text-center text-primary-dark flex-grow">
+        <div className="text-lg font-semibold text-center text-primary-dark flex-grow">
           Welcome to {APP_NAME}!
         </div>
-        <div className="text-sm font-bold bg-green-500 text-white px-3 py-1 rounded-full shadow-sm">
+        <div className="text-base font-bold bg-green-500 text-white px-4 py-2 rounded-full shadow-sm hover:shadow-md transition-shadow">
           Prize Pool: {poolBalance} USDC
         </div>
         {context?.user && (
           <div 
-            className="absolute top-1 right-1 cursor-pointer z-20"
+            className="absolute top-2 right-2 cursor-pointer z-20 hover:scale-105 transition-transform"
             onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
           >
             {context.user.pfpUrl && (
               <img 
                 src={context.user.pfpUrl} 
                 alt="Profile" 
-                className="w-6 h-6 rounded-full border-2 border-primary shadow-sm"
+                className="w-8 h-8 rounded-full border-2 border-primary shadow-sm"
               />
             )}
           </div>

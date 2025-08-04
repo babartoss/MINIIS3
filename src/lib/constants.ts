@@ -20,7 +20,7 @@ export const APP_TAGS = ['lottery', 'betting', 'lucky', 'draw', 'numbers', 'viet
 export const APP_ICON_URL: string = `${APP_URL}/icon.png`;
 
 // URL OG image (thay nếu cần)
-export const APP_OG_IMAGE_URL: string = `${APP_URL}/api/opengraph-image`;
+export const APP_OG_IMAGE_URL: string = `${APP_URL}/opengraph-image.png`;
 
 // URL splash (thay nếu cần)
 export const APP_SPLASH_URL: string = `${APP_URL}/splash.png`;
@@ -32,7 +32,7 @@ export const APP_SPLASH_BACKGROUND_COLOR: string = '#f7f7f7';
 export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined = undefined;
 
 // Text nút chính (true cho MINIIS3 vì dùng wallet cho contract)
-export const APP_BUTTON_TEXT = 'Try U Luck';
+export const APP_BUTTON_TEXT = 'Try Your Luck';
 
 // URL webhook (tự động dùng Neynar nếu có API key)
 export const APP_WEBHOOK_URL: string =

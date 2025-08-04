@@ -1,3 +1,4 @@
+// File: route.tsx
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 import { getNeynarUser } from "~/lib/neynar";
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
           </div>
         )}
         <h1 tw="text-8xl text-white">{user?.display_name ? `Hello from ${user.display_name ?? user.username}!` : 'Hello!'}</h1>
-        <p tw="text-5xl mt-4 text-white opacity-80">Powered by Neynar 🪐</p>
+        <p tw="text-5xl mt-4 text-white opacity-80">Sharing makes us stronger.  🪐</p>
       </div>
     ),
     {
