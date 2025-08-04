@@ -6,6 +6,7 @@
 // - Placed round and prize pool badges in a horizontal flex-row at bottom for compactness.
 // - Ensured responsive: flex-col on mobile for stacking, flex-row on sm+ for side-by-side.
 // - Suggestions for professionalism: Added subtle text-shadow-md for readability, uppercase for labels, and hover:shadow-lg on card for interactivity. Consider adding a custom vintage font via @font-face in globals.css if available.
+// - Sync round with contract: Fetch currentRound from contract instead of date calculation, to match cron updates.
 
 "use client";
 
@@ -31,20 +32,23 @@ export function Header({ neynarUser }: HeaderProps) {
   const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://sepolia.base.org';
 
   useEffect(() => {
-    // Calculate round number
-    const updateRound = () => {
-      const now = new Date();
-      const start = new Date(now);
-      start.setUTCHours(12, 30, 0, 0);
-      if (now < start) start.setUTCDate(start.getUTCDate() - 1);
-      const daysSinceStart = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      setRoundNumber(daysSinceStart);
+    // Fetch current round from contract
+    const fetchRound = async () => {
+      if (!contractAddress) return;
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const contract = new ethers.Contract(contractAddress, ['function currentRound() view returns (uint256)'], provider);
+      try {
+        const round = Number(await contract.currentRound());
+        setRoundNumber(round);
+      } catch (error) {
+        console.error('Error fetching round:', error);
+      }
     };
 
-    updateRound();
-    const interval = setInterval(updateRound, 60000);
+    fetchRound();
+    const interval = setInterval(fetchRound, 60000); // Poll every minute
     return () => clearInterval(interval);
-  }, []);
+  }, [contractAddress, rpcUrl]);
 
   useEffect(() => {
     // Fetch pool balance
