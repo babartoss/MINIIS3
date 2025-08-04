@@ -1,14 +1,11 @@
 // Updated: src/components/Header.tsx
 // Changes:
-// - Redesigned layout to match vintage badge style from the image: Yellow background, red-brown border, rounded corners.
-// - Mapped elements to image: "GUESS THAT PRICE!" -> "Welcome to {APP_NAME}!" in large navy text.
-// - Avatar: Circular image on left, using user pfpUrl.
-// - Name section: "NAME" in red, username in large navy.
-// - ID section: "FID" in red (instead of ID, as per app context), FID in large navy (removed duplication from image).
-// - Integrated round and prize pool as subtle badges at bottom for functionality.
-// - Used Tailwind classes for styling: bg-yellow-400, border-red-800, text-navy (add navy to tailwind.config if needed, or use text-blue-900).
-// - Maintained responsive design: flex-row on sm+, flex-col on mobile; avatar clickable for dropdown.
-// - Ensured no overlap, with padding and gaps for balance.
+// - Made layout more compact: Reduced padding to py-3 px-4, added w-fit mx-auto to fit content tightly.
+// - Adjusted text sizes: Smaller fonts (text-lg for welcome, text-md for name, text-sm for FID) to fit horizontally better.
+// - Simplified user info: "Name: BARBATOS" on line 1, "FID: 1042494" on line 2, removed duplication of FID values.
+// - Placed round and prize pool badges in a horizontal flex-row at bottom for compactness.
+// - Ensured responsive: flex-col on mobile for stacking, flex-row on sm+ for side-by-side.
+// - Suggestions for professionalism: Added subtle text-shadow-md for readability, uppercase for labels, and hover:shadow-lg on card for interactivity. Consider adding a custom vintage font via @font-face in globals.css if available.
 
 "use client";
 
@@ -71,12 +68,12 @@ export function Header({ neynarUser }: HeaderProps) {
   return (
     <div className="relative max-w-full">
       <div 
-        className="mt-2 mb-2 mx-4 px-4 py-4 bg-yellow-400 border-4 border-red-800 rounded-xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-4"
+        className="mt-2 mb-2 mx-auto px-4 py-3 bg-yellow-400 border-4 border-red-800 rounded-xl shadow-md hover:shadow-lg transition-shadow w-fit flex flex-col sm:flex-row items-center justify-between gap-3"
       >
         <div className="w-full text-center sm:text-left">
-          <h1 className="text-3xl font-bold text-blue-900">Welcome to {APP_NAME}!</h1>
+          <h1 className="text-lg font-bold text-blue-900 text-shadow-md">Welcome to {APP_NAME}!</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {context?.user && (
             <div 
               className="cursor-pointer hover:scale-105 transition-transform"
@@ -86,22 +83,17 @@ export function Header({ neynarUser }: HeaderProps) {
                 <img 
                   src={context.user.pfpUrl} 
                   alt="Profile" 
-                  className="w-20 h-20 rounded-full border-4 border-blue-900 shadow-md"
+                  className="w-16 h-16 rounded-full border-4 border-blue-900 shadow-md"
                 />
               )}
             </div>
           )}
           <div className="text-center sm:text-left">
-            <p className="text-red-600 font-bold text-lg">NAME</p>
-            <p className="text-blue-900 font-bold text-2xl">{context?.user?.displayName || context?.user?.username || 'Guest'}</p>
-            <div className="flex justify-between mt-2">
-              <p className="text-blue-900 font-bold text-xl">{context?.user?.fid || 'N/A'}</p>
-              <p className="text-red-600 font-bold text-lg">FID</p>
-              <p className="text-blue-900 font-bold text-xl">{context?.user?.fid || 'N/A'}</p>
-            </div>
+            <p className="text-md font-bold text-blue-900 uppercase"><span className="text-red-600">Name:</span> {context?.user?.displayName || context?.user?.username || 'Guest'}</p>
+            <p className="text-sm font-bold text-blue-900 uppercase"><span className="text-red-600">FID:</span> {context?.user?.fid || 'N/A'}</p>
           </div>
         </div>
-        <div className="flex flex-col items-center gap-2 mt-4 sm:mt-0">
+        <div className="flex flex-row items-center gap-2 mt-2 sm:mt-0">
           <div className="text-sm font-bold bg-primary text-white px-3 py-1 rounded-full shadow-sm">
             ROUND {roundNumber}
           </div>

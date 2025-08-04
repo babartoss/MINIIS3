@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Manifest } from '@farcaster/miniapp-core/src/manifest';
+// Import Manifest nếu cần, nhưng dùng any để linh hoạt
+// import { Manifest } from '@farcaster/miniapp-core/src/manifest';
 import {
   APP_BUTTON_TEXT,
   APP_DESCRIPTION,
@@ -46,20 +47,21 @@ export function getMiniAppEmbedMetadata(ogImageUrl?: string) {
   };
 }
 
-// Manifest cho Farcaster domain
-export async function getFarcasterDomainManifest(): Promise<Manifest> {
+// Manifest cho Farcaster domain (dùng frame thay miniapp, thêm triggers)
+export async function getFarcasterDomainManifest(): Promise<any> {  // Dùng any để tránh type error
   return {
     accountAssociation: APP_ACCOUNT_ASSOCIATION!,
-    miniapp: {
+    frame: {
       version: '1',
-      name: APP_NAME ?? 'Neynar Starter Kit',
+      name: APP_NAME ?? 'MINIIS3',
       homeUrl: APP_URL,
       iconUrl: APP_ICON_URL,
       imageUrl: APP_OG_IMAGE_URL,
-      buttonTitle: APP_BUTTON_TEXT ?? 'Launch Mini App',
+      buttonTitle: APP_BUTTON_TEXT ?? 'Try Your Luck',
       splashImageUrl: APP_SPLASH_URL,
       splashBackgroundColor: APP_SPLASH_BACKGROUND_COLOR,
       webhookUrl: APP_WEBHOOK_URL,
     },
+    triggers: [],  // Thêm empty array, nếu có triggers thì thêm object như { type: "cast", id: "your-id", url: "your-url" }
   };
 }

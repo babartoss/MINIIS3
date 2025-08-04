@@ -28,8 +28,12 @@ export const APP_SPLASH_URL: string = `${APP_URL}/splash.png`;
 // Màu nền splash (thay nếu cần)
 export const APP_SPLASH_BACKGROUND_COLOR: string = '#f7f7f7';
 
-// Liên kết tài khoản
-export const APP_ACCOUNT_ASSOCIATION: AccountAssociation | undefined = undefined;
+// Liên kết tài khoản (cập nhật từ Domainmanifest.txt, với signature sửa thành chuẩn hex)
+export const APP_ACCOUNT_ASSOCIATION: AccountAssociation = {
+  header: 'eyJmaWQiOjEwNDI0OTQsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHgyNTE2YTg4MjUwNGZjMEM0NDNENUUxM2NiNzk4OEIzNGJiQWQyNTU5In0',
+  payload: 'eyJkb21haW4iOiJtaW5paXMtMy52ZXJjZWwuYXBwIn0',
+  signature: '0x12f8eab02eeeb79ec83d4f63cf39c046e6e6249f64d09b2bbde3a9527fa64cfe1877d11eea7b7e0c2f64846a148d0b8bbf46d0eca21174224a01e843ea9d4a241b'
+};
 
 // Text nút chính (true cho MINIIS3 vì dùng wallet cho contract)
 export const APP_BUTTON_TEXT = 'Try Your Luck';
