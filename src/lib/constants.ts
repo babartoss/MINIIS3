@@ -1,4 +1,4 @@
-// File: src/lib/constants.ts (Updated, no major changes but ensure APP_NAME)
+// File: src/lib/constants.ts (Updated for mainnet)
 import { type AccountAssociation } from '@farcaster/miniapp-core/src/manifest';
 
 // URL cơ bản (thay NEXT_PUBLIC_URL trong .env nếu cần)
@@ -50,8 +50,8 @@ export const USE_WALLET = true;
 // Bật/tắt analytics
 export const ANALYTICS_ENABLED = false;
 
-// Chain yêu cầu (true cho MINIIS3 vì dùng wallet cho contract)
-export const APP_REQUIRED_CHAINS: string[] = ['eip155:84532'];  // Base Sepolia testnet, thay nếu mainnet
+// Chain yêu cầu (updated for mainnet Base)
+export const APP_REQUIRED_CHAINS: string[] = ['eip155:8453'];  // Base mainnet
 
 // Không thay đổi (EIP-712 cho signed key)
 export const SIGNED_KEY_REQUEST_VALIDATOR_EIP_712_DOMAIN = {

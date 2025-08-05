@@ -11,7 +11,7 @@ export function RewardTab() {
   const [loadingClaim, setLoadingClaim] = useState<number | null>(null); // To show loading when claiming
 
   const contractAddress = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '') as `0x${string}`;
-  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://sepolia.base.org'; // Use testnet RPC
+  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';  // Updated to mainnet
 
   const { writeContractAsync: claimRewardAsync } = useWriteContract(); // Wagmi hook for writing to contract
 

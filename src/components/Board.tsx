@@ -4,7 +4,7 @@ import { useAccount, useWriteContract, useChainId, useSwitchChain, useWaitForTra
 import { useSignIn } from '@farcaster/auth-kit';
 import ApproveModal from './ApproveModal';
 import ShareModal from './ShareModal';
-import { baseSepolia } from 'wagmi/chains';
+import { base } from 'wagmi/chains';  // Changed to mainnet Base
 
 const Board: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
@@ -18,15 +18,15 @@ const Board: React.FC = () => {
   const [showShare, setShowShare] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [approveHash, setApproveHash] = useState<string | null>(null);
-  const [selectHash, setSelectHash] = useState<string | null>(null); // New for select wait
-  const [errorMessage, setErrorMessage] = useState<string | null>(null); // New for UI error
+  const [selectHash, setSelectHash] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBetClosed, setIsBetClosed] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<Set<number>>(new Set());
   const numbers = Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'));
 
   const contractAddress = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '') as `0x${string}`;
   const usdcAddress = (process.env.NEXT_PUBLIC_USDC_ADDRESS || '') as `0x${string}`;
-  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://sepolia.base.org';
+  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';  // Updated to mainnet
   const betCloseStart = parseInt(process.env.NEXT_PUBLIC_BET_CLOSE_START_HOUR || '11');
   const betCloseEnd = parseInt(process.env.NEXT_PUBLIC_BET_CLOSE_END_HOUR || '12');
 
@@ -85,10 +85,10 @@ const Board: React.FC = () => {
             functionName: 'selectNumber',
             args: [selectedNumber],
           });
-          setSelectHash(hash); // Set for wait select
-        } catch (error) {
+          setSelectHash(hash);
+        } catch (error: any) {
           console.error('Select failed:', error);
-          setErrorMessage('Select number failed. Please try again.');
+          setErrorMessage(`Select number failed: ${error.message || 'Unknown error'}`);
           setApproveHash(null);
         }
       })();
@@ -108,15 +108,11 @@ const Board: React.FC = () => {
       setShowShare(true);
 
       if (userAddress && fid) {
-        try {
-          fetch('/api/record-selection', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fid, address: userAddress }),
-          }).then(() => console.log('Mapping recorded'));
-        } catch (error) {
-          console.error('Record error:', error);
-        }
+        fetch('/api/record-selection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fid, address: userAddress }),
+        }).then(() => console.log('Mapping recorded')).catch(error => console.error('Record error:', error));
       }
       setSelectHash(null);
     } else if (selectHash && selectReceipt.isError) {
@@ -137,16 +133,16 @@ const Board: React.FC = () => {
       return;
     }
 
-    setErrorMessage(null); // Clear previous error
+    setErrorMessage(null);
     console.log('Starting handleConfirm - Chain ID:', chainId, 'Connected:', isConnected);
 
-    if (chainId !== baseSepolia.id) {
-      console.log('Switching to Base Sepolia');
+    if (chainId !== base.id) {  // Changed to base.id for mainnet
+      console.log('Switching to Base Mainnet');
       try {
-        await switchChain({ chainId: baseSepolia.id });
-      } catch (error) {
+        await switchChain({ chainId: base.id });
+      } catch (error: any) {
         console.error('Switch chain failed:', error);
-        setErrorMessage('Failed to switch to Base Sepolia chain.');
+        setErrorMessage(`Failed to switch chain: ${error.message || 'Unknown error'}`);
         return;
       }
     }
@@ -187,9 +183,9 @@ const Board: React.FC = () => {
         });
         setSelectHash(hash);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Transaction failed:', error);
-      setErrorMessage('Transaction failed. Check console for details.');
+      setErrorMessage(`Transaction failed: ${error.message || 'Unknown error. Check wallet or chain.'}`);
     }
   };
 
@@ -206,7 +202,7 @@ const Board: React.FC = () => {
         margin: '0 auto',
       }}
     >
-      {errorMessage && <div className="bg-red-500 text-white p-2 mb-4 rounded">{errorMessage}</div>} {/* New UI error */}
+      {errorMessage && <div className="bg-red-500 text-white p-2 mb-4 rounded">{errorMessage}</div>}
       <div className="grid grid-cols-10 gap-1 sm:gap-2 auto-rows-fr max-w-[640px] mx-auto mb-4">
         {numbers.map(num => (
           <button

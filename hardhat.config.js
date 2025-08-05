@@ -1,18 +1,30 @@
 require('@nomicfoundation/hardhat-toolbox');
-require('dotenv').config(); // Load .env
+require('dotenv').config();
 
 module.exports = {
   solidity: "0.8.20",
   networks: {
-    baseSepolia: {
-      url: process.env.NEXT_PUBLIC_BASE_RPC_URL || "https://sepolia.base.org",
-      accounts: process.env.OWNER_PRIVATE_KEY ? [process.env.OWNER_PRIVATE_KEY] : []
+    baseSepolia: { // Giữ testnet
+      url: "https://sepolia.base.org",
+      accounts: [process.env.OWNER_PRIVATE_KEY]
+    },
+    base: { // Thêm mainnet
+      url: "https://mainnet.base.org",
+      accounts: [process.env.OWNER_PRIVATE_KEY]
     }
   },
   etherscan: {
-    apiKey: "IC5VI6E9IGBF5UVYWIVXST5MWFYCUPR97S", // Single string V2
+    apiKey: "IC5VI6E9IGBF5UVYWIVXST5MWFYCUPR97S", // Giữ
     customChains: [
       {
+        network: "base",
+        chainId: 8453,
+        urls: {
+          apiURL: "https://api.basescan.org/api",
+          browserURL: "https://basescan.org"
+        }
+      },
+      { // Giữ Sepolia
         network: "baseSepolia",
         chainId: 84532,
         urls: {

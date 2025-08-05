@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState, useEffect } from "react";
-import { useAccount, useSendTransaction, useSignTypedData, useWaitForTransactionReceipt, useDisconnect, useConnect, useSwitchChain, useChainId, type Connector } from "wagmi"; // Added type Connector import
-import { baseSepolia } from "wagmi/chains";
+import { useAccount, useSendTransaction, useSignTypedData, useWaitForTransactionReceipt, useDisconnect, useConnect, useSwitchChain, useChainId, type Connector } from "wagmi";
+import { base } from "wagmi/chains";  // Changed to mainnet Base
 import { Button } from "../Button";
 import { truncateAddress } from "../../../lib/truncateAddress";
 import { renderError } from "../../../lib/errorUtils";
@@ -131,7 +131,7 @@ export function WalletTab() {
   }, [context?.user?.fid, isConnected, connectors, connect, context?.client]);
 
   const nextChain = useMemo(() => {
-    return baseSepolia;
+    return base;  // Changed to mainnet Base
   }, []);
 
   const handleSwitchChain = useCallback(() => {
