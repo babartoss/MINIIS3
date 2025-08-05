@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { useAccount, useWriteContract } from 'wagmi';
-import { useSignIn } from '@farcaster/auth-kit'; // Correct import for getting user data
+import { useAccount, useWriteContract, useChainId, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
+import { useSignIn } from '@farcaster/auth-kit';
 import ApproveModal from './ApproveModal';
 import ShareModal from './ShareModal';
+import { baseSepolia } from 'wagmi/chains';
 
 const Board: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
-  const { data: userData } = useSignIn({}); // Use useSignIn to get user data
-  const fid = userData?.fid; // FID của user hiện tại
+  const { data: userData } = useSignIn({});
+  const fid = userData?.fid;
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
 
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
   const [showApprove, setShowApprove] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [approveHash, setApproveHash] = useState<string | null>(null); // New state for approve hash
   const [isBetClosed, setIsBetClosed] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<Set<number>>(new Set());
   const numbers = Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'));
@@ -26,6 +30,11 @@ const Board: React.FC = () => {
 
   const { writeContractAsync: selectNumAsync } = useWriteContract();
   const { writeContractAsync: approveUSDCAsync } = useWriteContract();
+
+  // Hook wait receipt moved to component level
+  const approveReceipt = useWaitForTransactionReceipt({
+    hash: approveHash as `0x${string}` | undefined,
+  });
 
   useEffect(() => {
     const checkClosingTime = () => {
@@ -60,6 +69,48 @@ const Board: React.FC = () => {
     return () => clearInterval(interval);
   }, [contractAddress, rpcUrl]);
 
+  // New effect: If approve confirmed, proceed to select number
+  useEffect(() => {
+    if (approveHash && approveReceipt.isSuccess && selectedNumber !== null && userAddress) {
+      (async () => {
+        try {
+          console.log('Approve confirmed, selecting number');
+          const selectHash = await selectNumAsync({
+            address: contractAddress,
+            abi: ['function selectNumber(uint8)'],
+            functionName: 'selectNumber',
+            args: [selectedNumber],
+          });
+          console.log('Select tx hash:', selectHash);
+          setTxHash(selectHash);
+          setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
+          setShowApprove(false);
+          setShowShare(true);
+
+          if (userAddress && fid) {
+            try {
+              await fetch('/api/record-selection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fid, address: userAddress }),
+              });
+              console.log('Mapping recorded');
+            } catch (error) {
+              console.error('Record error:', error);
+            }
+          }
+        } catch (error) {
+          console.error('Select failed:', error);
+        } finally {
+          setApproveHash(null); // Reset approveHash after process
+        }
+      })();
+    } else if (approveHash && approveReceipt.isError) {
+      console.error('Approve tx failed');
+      setApproveHash(null); // Reset on error
+    }
+  }, [approveReceipt.isSuccess, approveReceipt.isError, approveHash, selectedNumber, userAddress, fid, selectNumAsync, contractAddress]);
+
   const handleSelect = (num: string) => {
     if (isBetClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;
     setSelectedNumber(parseInt(num));
@@ -69,50 +120,74 @@ const Board: React.FC = () => {
   const handleConfirm = async () => {
     if (isBetClosed || !selectedNumber || !userAddress) return;
 
+    console.log('Starting handleConfirm - Chain ID:', chainId);
+
+    if (chainId !== baseSepolia.id) {
+      console.log('Switching to Base Sepolia');
+      try {
+        await switchChain({ chainId: baseSepolia.id });
+      } catch (error) {
+        console.error('Switch chain failed:', error);
+        return;
+      }
+    }
+
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const usdcContract = new ethers.Contract(usdcAddress, [
-      'function allowance(address owner, address spender) view returns (uint256)'
+      'function allowance(address owner, address spender) view returns (uint256)',
+      'function balanceOf(address account) view returns (uint256)'
     ], provider);
+
     const allowance = await usdcContract.allowance(userAddress, contractAddress);
+    const balance = await usdcContract.balanceOf(userAddress);
+    console.log('USDC Balance:', balance.toString(), 'Allowance:', allowance.toString());
+
+    if (balance < BigInt(10000)) {
+      console.error('Insufficient USDC balance');
+      return; // Thêm alert hoặc UI error nếu cần
+    }
 
     try {
       if (allowance < BigInt(10000)) {
-        const approveHash = await approveUSDCAsync({
+        console.log('Approving USDC');
+        const hash = await approveUSDCAsync({
           address: usdcAddress,
           abi: ['function approve(address spender, uint256 amount) public returns (bool)'],
           functionName: 'approve',
           args: [contractAddress, BigInt(10000)],
         });
-        console.log('Approve tx hash:', approveHash);
-      }
+        console.log('Approve tx hash:', hash);
+        setApproveHash(hash); // Set hash to trigger wait
+      } else {
+        // If no approve needed, directly select (simulate by calling the select logic)
+        console.log('No approve needed, selecting number');
+        const selectHash = await selectNumAsync({
+          address: contractAddress,
+          abi: ['function selectNumber(uint8)'],
+          functionName: 'selectNumber',
+          args: [selectedNumber],
+        });
+        console.log('Select tx hash:', selectHash);
+        setTxHash(selectHash);
+        setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
+        setShowApprove(false);
+        setShowShare(true);
 
-      const selectHash = await selectNumAsync({
-        address: contractAddress,
-        abi: ['function selectNumber(uint8)'],
-        functionName: 'selectNumber',
-        args: [selectedNumber],
-      });
-
-      setTxHash(selectHash);
-      setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
-      setShowApprove(false);
-      setShowShare(true);
-
-      // New: Record mapping address -> FID sau tx success
-      if (userAddress && fid) {
-        try {
-          await fetch('/api/record-selection', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fid, address: userAddress }),
-          });
-          console.log('Mapping recorded for address:', userAddress);
-        } catch (error) {
-          console.error('Error recording mapping:', error);
+        if (userAddress && fid) {
+          try {
+            await fetch('/api/record-selection', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fid, address: userAddress }),
+            });
+            console.log('Mapping recorded');
+          } catch (error) {
+            console.error('Record error:', error);
+          }
         }
       }
     } catch (error) {
-      console.error('Transaction failed:', error);
+      console.error('Tx failed:', error);
     }
   };
 
