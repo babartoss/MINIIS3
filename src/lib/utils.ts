@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-// Import Manifest nếu cần, nhưng dùng any để linh hoạt
+// Import Manifest nếu cần, nhưng dùng any để linh hoạt và fix type error
 // import { Manifest } from '@farcaster/miniapp-core/src/manifest';
 import {
   APP_BUTTON_TEXT,
@@ -22,7 +22,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Metadata cho embed miniapp (thay ogImageUrl nếu cần custom)
+// Metadata cho embed miniapp (thay ogImageUrl nếu cần custom) - Giữ để embed frame trong Warpcast
 export function getMiniAppEmbedMetadata(ogImageUrl?: string) {
   return {
     version: 'next',
@@ -47,21 +47,21 @@ export function getMiniAppEmbedMetadata(ogImageUrl?: string) {
   };
 }
 
-// Manifest cho Farcaster domain (dùng frame thay miniapp, thêm triggers)
-export async function getFarcasterDomainManifest(): Promise<any> {  // Dùng any để tránh type error
+// Manifest cho Farcaster domain (match spec 2025: required version/name/homeUrl/imageUrl/buttonTitle; optional icon/splash/webhook)
+export async function getFarcasterDomainManifest(): Promise<any> {  // Dùng any để fix type error với 'triggers'
   return {
     accountAssociation: APP_ACCOUNT_ASSOCIATION!,
     frame: {
-      version: '1',
-      name: APP_NAME ?? 'MINIIS3',
-      homeUrl: APP_URL,
-      iconUrl: APP_ICON_URL,
-      imageUrl: APP_OG_IMAGE_URL,
-      buttonTitle: APP_BUTTON_TEXT ?? 'Try Your Luck',
-      splashImageUrl: APP_SPLASH_URL,
-      splashBackgroundColor: APP_SPLASH_BACKGROUND_COLOR,
-      webhookUrl: APP_WEBHOOK_URL,
+      version: '1',  // Required
+      name: APP_NAME,  // Required, use 'MINIIS3'
+      homeUrl: APP_URL,  // Required
+      imageUrl: APP_OG_IMAGE_URL,  // Required, 3:2 ratio
+      buttonTitle: APP_BUTTON_TEXT,  // Required, 'Try Your Luck'
+      iconUrl: APP_ICON_URL,  // Optional, 200x200 PNG
+      splashImageUrl: APP_SPLASH_URL,  // Optional
+      splashBackgroundColor: APP_SPLASH_BACKGROUND_COLOR,  // Optional
+      webhookUrl: APP_WEBHOOK_URL,  // Optional for notifications
     },
-    triggers: [],  // Thêm empty array, nếu có triggers thì thêm object như { type: "cast", id: "your-id", url: "your-url" }
+    triggers: [],  // Optional, giữ empty nếu không có
   };
 }
