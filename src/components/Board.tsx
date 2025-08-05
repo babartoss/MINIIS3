@@ -17,7 +17,9 @@ const Board: React.FC = () => {
   const [showApprove, setShowApprove] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [approveHash, setApproveHash] = useState<string | null>(null); // New state for approve hash
+  const [approveHash, setApproveHash] = useState<string | null>(null);
+  const [selectHash, setSelectHash] = useState<string | null>(null); // New for select wait
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // New for UI error
   const [isBetClosed, setIsBetClosed] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<Set<number>>(new Set());
   const numbers = Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'));
@@ -31,9 +33,12 @@ const Board: React.FC = () => {
   const { writeContractAsync: selectNumAsync } = useWriteContract();
   const { writeContractAsync: approveUSDCAsync } = useWriteContract();
 
-  // Hook wait receipt moved to component level
   const approveReceipt = useWaitForTransactionReceipt({
     hash: approveHash as `0x${string}` | undefined,
+  });
+
+  const selectReceipt = useWaitForTransactionReceipt({
+    hash: selectHash as `0x${string}` | undefined,
   });
 
   useEffect(() => {
@@ -69,47 +74,56 @@ const Board: React.FC = () => {
     return () => clearInterval(interval);
   }, [contractAddress, rpcUrl]);
 
-  // New effect: If approve confirmed, proceed to select number
   useEffect(() => {
     if (approveHash && approveReceipt.isSuccess && selectedNumber !== null && userAddress) {
       (async () => {
         try {
           console.log('Approve confirmed, selecting number');
-          const selectHash = await selectNumAsync({
+          const hash = await selectNumAsync({
             address: contractAddress,
             abi: ['function selectNumber(uint8)'],
             functionName: 'selectNumber',
             args: [selectedNumber],
           });
-          console.log('Select tx hash:', selectHash);
-          setTxHash(selectHash);
-          setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
-          setShowApprove(false);
-          setShowShare(true);
-
-          if (userAddress && fid) {
-            try {
-              await fetch('/api/record-selection', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fid, address: userAddress }),
-              });
-              console.log('Mapping recorded');
-            } catch (error) {
-              console.error('Record error:', error);
-            }
-          }
+          setSelectHash(hash); // Set for wait select
         } catch (error) {
           console.error('Select failed:', error);
-        } finally {
-          setApproveHash(null); // Reset approveHash after process
+          setErrorMessage('Select number failed. Please try again.');
+          setApproveHash(null);
         }
       })();
     } else if (approveHash && approveReceipt.isError) {
       console.error('Approve tx failed');
-      setApproveHash(null); // Reset on error
+      setErrorMessage('Approve transaction failed.');
+      setApproveHash(null);
     }
-  }, [approveReceipt.isSuccess, approveReceipt.isError, approveHash, selectedNumber, userAddress, fid, selectNumAsync, contractAddress]);
+  }, [approveReceipt.isSuccess, approveReceipt.isError, approveHash, selectedNumber, userAddress, selectNumAsync, contractAddress]);
+
+  useEffect(() => {
+    if (selectHash && selectReceipt.isSuccess) {
+      console.log('Select confirmed');
+      setTxHash(selectHash);
+      setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
+      setShowApprove(false);
+      setShowShare(true);
+
+      if (userAddress && fid) {
+        try {
+          fetch('/api/record-selection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fid, address: userAddress }),
+          }).then(() => console.log('Mapping recorded'));
+        } catch (error) {
+          console.error('Record error:', error);
+        }
+      }
+      setSelectHash(null);
+    } else if (selectHash && selectReceipt.isError) {
+      setErrorMessage('Select transaction failed.');
+      setSelectHash(null);
+    }
+  }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash, selectedNumber, userAddress, fid]);
 
   const handleSelect = (num: string) => {
     if (isBetClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;
@@ -118,9 +132,13 @@ const Board: React.FC = () => {
   };
 
   const handleConfirm = async () => {
-    if (isBetClosed || !selectedNumber || !userAddress) return;
+    if (isBetClosed || !selectedNumber || !userAddress || !isConnected) {
+      setErrorMessage('Wallet not connected or invalid state.');
+      return;
+    }
 
-    console.log('Starting handleConfirm - Chain ID:', chainId);
+    setErrorMessage(null); // Clear previous error
+    console.log('Starting handleConfirm - Chain ID:', chainId, 'Connected:', isConnected);
 
     if (chainId !== baseSepolia.id) {
       console.log('Switching to Base Sepolia');
@@ -128,6 +146,7 @@ const Board: React.FC = () => {
         await switchChain({ chainId: baseSepolia.id });
       } catch (error) {
         console.error('Switch chain failed:', error);
+        setErrorMessage('Failed to switch to Base Sepolia chain.');
         return;
       }
     }
@@ -138,16 +157,16 @@ const Board: React.FC = () => {
       'function balanceOf(address account) view returns (uint256)'
     ], provider);
 
-    const allowance = await usdcContract.allowance(userAddress, contractAddress);
-    const balance = await usdcContract.balanceOf(userAddress);
-    console.log('USDC Balance:', balance.toString(), 'Allowance:', allowance.toString());
-
-    if (balance < BigInt(10000)) {
-      console.error('Insufficient USDC balance');
-      return; // Thêm alert hoặc UI error nếu cần
-    }
-
     try {
+      const allowance = await usdcContract.allowance(userAddress, contractAddress);
+      const balance = await usdcContract.balanceOf(userAddress);
+      console.log('USDC Balance:', balance.toString(), 'Allowance:', allowance.toString());
+
+      if (balance < BigInt(10000)) {
+        setErrorMessage('Insufficient USDC balance (need at least 0.01 USDC).');
+        return;
+      }
+
       if (allowance < BigInt(10000)) {
         console.log('Approving USDC');
         const hash = await approveUSDCAsync({
@@ -157,37 +176,20 @@ const Board: React.FC = () => {
           args: [contractAddress, BigInt(10000)],
         });
         console.log('Approve tx hash:', hash);
-        setApproveHash(hash); // Set hash to trigger wait
+        setApproveHash(hash);
       } else {
-        // If no approve needed, directly select (simulate by calling the select logic)
         console.log('No approve needed, selecting number');
-        const selectHash = await selectNumAsync({
+        const hash = await selectNumAsync({
           address: contractAddress,
           abi: ['function selectNumber(uint8)'],
           functionName: 'selectNumber',
           args: [selectedNumber],
         });
-        console.log('Select tx hash:', selectHash);
-        setTxHash(selectHash);
-        setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
-        setShowApprove(false);
-        setShowShare(true);
-
-        if (userAddress && fid) {
-          try {
-            await fetch('/api/record-selection', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fid, address: userAddress }),
-            });
-            console.log('Mapping recorded');
-          } catch (error) {
-            console.error('Record error:', error);
-          }
-        }
+        setSelectHash(hash);
       }
     } catch (error) {
-      console.error('Tx failed:', error);
+      console.error('Transaction failed:', error);
+      setErrorMessage('Transaction failed. Check console for details.');
     }
   };
 
@@ -204,13 +206,14 @@ const Board: React.FC = () => {
         margin: '0 auto',
       }}
     >
+      {errorMessage && <div className="bg-red-500 text-white p-2 mb-4 rounded">{errorMessage}</div>} {/* New UI error */}
       <div className="grid grid-cols-10 gap-1 sm:gap-2 auto-rows-fr max-w-[640px] mx-auto mb-4">
         {numbers.map(num => (
           <button
             key={num}
             onClick={() => handleSelect(num)}
             className={`aspect-square flex items-center justify-center text-base font-bold rounded-lg relative shadow-md p-1 sm:p-2 ${isBetClosed || selectedNumbers.has(parseInt(num)) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-dark hover:scale-105 active:scale-95 transition-all duration-200'} bg-primary text-white`}
-            disabled={isBetClosed || selectedNumbers.has(parseInt(num))}
+            disabled={isBetClosed || selectedNumbers.has(parseInt(num)) || !isConnected}
           >
             {num}
             {selectedNumbers.has(parseInt(num)) && <span className="absolute top-0 right-0 text-green-500 text-xs sm:text-sm">✅</span>}
