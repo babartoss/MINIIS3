@@ -1,12 +1,12 @@
+// File: src/components/WalletTab.tsx (Simplified version with Connector type import)
 "use client";
 
-import { useCallback, useMemo, useState, useEffect } from "react";
-import { useAccount, useSendTransaction, useSignTypedData, useWaitForTransactionReceipt, useDisconnect, useConnect, useSwitchChain, useChainId, type Connector } from "wagmi";
+import { useCallback, useEffect } from "react";
+import { useAccount, useDisconnect, useConnect, useSwitchChain, useChainId, type Connector } from "wagmi"; // Added type Connector import
 import { base } from "wagmi/chains";  // Changed to mainnet Base
 import { Button } from "../Button";
 import { truncateAddress } from "../../../lib/truncateAddress";
-import { renderError } from "../../../lib/errorUtils";
-import { USE_WALLET, APP_NAME } from "../../../lib/constants";
+import { USE_WALLET } from "../../../lib/constants";
 import { useMiniApp } from "@neynar/react";
 
 // Extend window type for ethereum if needed
@@ -78,40 +78,18 @@ function ConnectionControls({
 }
 
 export function WalletTab() {
-  const [evmContractTransactionHash, setEvmContractTransactionHash] = useState<string | null>(null);
-  
-  const { context } = useMiniApp();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-
-  const {
-    sendTransaction,
-    error: evmTransactionError,
-    isError: isEvmTransactionError,
-    isPending: isEvmTransactionPending,
-  } = useSendTransaction();
-
-  const { isLoading: isEvmTransactionConfirming, isSuccess: isEvmTransactionConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: evmContractTransactionHash as `0x${string}`,
-    });
-
-  const {
-    signTypedData,
-    error: evmSignTypedDataError,
-    isError: isEvmSignTypedDataError,
-    isPending: isEvmSignTypedDataPending,
-  } = useSignTypedData();
 
   const { disconnect } = useDisconnect();
   const { connect, connectors } = useConnect();
 
   const {
     switchChain,
-    error: chainSwitchError,
-    isError: isChainSwitchError,
     isPending: isChainSwitchPending,
   } = useSwitchChain();
+
+  const { context } = useMiniApp();
 
   useEffect(() => {
     const isInFarcasterClient = typeof window !== 'undefined' && 
@@ -130,44 +108,9 @@ export function WalletTab() {
     }
   }, [context?.user?.fid, isConnected, connectors, connect, context?.client]);
 
-  const nextChain = useMemo(() => {
-    return base;  // Changed to mainnet Base
-  }, []);
-
   const handleSwitchChain = useCallback(() => {
-    switchChain({ chainId: nextChain.id });
-  }, [switchChain, nextChain.id]);
-
-  const sendEvmContractTransaction = useCallback(() => {
-    sendTransaction(
-      {
-        to: "0x4bBFD120d9f352A0BEd7a014bd67913a2007a878",
-        data: "0x9846cd9efc000023c0",
-      },
-      {
-        onSuccess: (hash) => {
-          setEvmContractTransactionHash(hash);
-        },
-      }
-    );
-  }, [sendTransaction]);
-
-  const signTyped = useCallback(() => {
-    signTypedData({
-      domain: {
-        name: APP_NAME,
-        version: "1",
-        chainId,
-      },
-      types: {
-        Message: [{ name: "content", type: "string" }],
-      },
-      message: {
-        content: `Hello from ${APP_NAME}!`,
-      },
-      primaryType: "Message",
-    });
-  }, [chainId, signTypedData]);
+    switchChain({ chainId: base.id });
+  }, [switchChain]);
 
   if (!USE_WALLET) {
     return null;
@@ -194,40 +137,13 @@ export function WalletTab() {
         {isConnected && (
           <div className="space-y-4">
             <Button
-              onClick={sendEvmContractTransaction}
-              disabled={isEvmTransactionPending}
-              isLoading={isEvmTransactionPending}
-              className="w-full"
-            >
-              Send Test Contract Transaction
-            </Button>
-            {isEvmTransactionError && renderError(evmTransactionError)}
-            {evmContractTransactionHash && (
-              <div className="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded">
-                <div>Transaction Hash: {truncateAddress(evmContractTransactionHash)}</div>
-                <div>Status: {isEvmTransactionConfirming ? "Confirming..." : isEvmTransactionConfirmed ? "Confirmed!" : "Pending"}</div>
-              </div>
-            )}
-            
-            <Button
-              onClick={signTyped}
-              disabled={isEvmSignTypedDataPending}
-              isLoading={isEvmSignTypedDataPending}
-              className="w-full"
-            >
-              Sign Typed Data
-            </Button>
-            {isEvmSignTypedDataError && renderError(evmSignTypedDataError)}
-            
-            <Button
               onClick={handleSwitchChain}
               disabled={isChainSwitchPending}
               isLoading={isChainSwitchPending}
               className="w-full"
             >
-              Switch to {nextChain.name}
+              Switch to {base.name}
             </Button>
-            {isChainSwitchError && renderError(chainSwitchError)}
           </div>
         )}
       </div>
