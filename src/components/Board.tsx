@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { useAccount, useWriteContract, useChainId, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useChainId, useSwitchChain, useWaitForTransactionReceipt, useConnect } from 'wagmi';
 import { useSignIn } from '@farcaster/auth-kit';
+import { useMiniApp } from '@neynar/react'; // Thêm import này cho auto-connect
 import ApproveModal from './ApproveModal';
 import ShareModal from './ShareModal';
-import { base } from 'wagmi/chains';  // Changed to mainnet Base
+import { base } from 'wagmi/chains';
+import { config } from '@/components/providers/WagmiProvider'; // Sửa đường dẫn import sử dụng alias @/ từ tsconfig.json (baseUrl: ./src, paths: @/* -> ./src/*)
 
 const Board: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
@@ -12,6 +14,9 @@ const Board: React.FC = () => {
   const fid = userData?.fid;
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const { connect, connectors } = useConnect(); // Thêm useConnect cho auto-connect
+
+  const { context } = useMiniApp(); // Thêm useMiniApp để lấy context cho auto-connect
 
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
   const [showApprove, setShowApprove] = useState(false);
@@ -26,7 +31,7 @@ const Board: React.FC = () => {
 
   const contractAddress = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '') as `0x${string}`;
   const usdcAddress = (process.env.NEXT_PUBLIC_USDC_ADDRESS || '') as `0x${string}`;
-  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';  // Updated to mainnet
+  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
   const betCloseStart = parseInt(process.env.NEXT_PUBLIC_BET_CLOSE_START_HOUR || '11');
   const betCloseEnd = parseInt(process.env.NEXT_PUBLIC_BET_CLOSE_END_HOUR || '12');
 
@@ -40,6 +45,25 @@ const Board: React.FC = () => {
   const selectReceipt = useWaitForTransactionReceipt({
     hash: selectHash as `0x${string}` | undefined,
   });
+
+  // Thêm useEffect cho auto-connect wallet, tương tự WalletTab.tsx
+  useEffect(() => {
+    const isInFarcasterClient = typeof window !== 'undefined' && 
+      (window.location.href.includes('warpcast.com') || 
+       window.location.href.includes('farcaster') ||
+       window.ethereum?.isFarcaster ||
+       context?.client);
+    
+    if (fid && !isConnected && connectors.length > 0 && isInFarcasterClient) {
+      console.log("Auto-connecting Farcaster wallet in Board...");
+      try {
+        connect({ connector: connectors[0] }); // Connect với farcasterFrame connector
+      } catch (error) {
+        console.error("Auto-connect failed in Board:", error);
+        setErrorMessage('Auto-connect wallet failed. Please connect manually.');
+      }
+    }
+  }, [fid, isConnected, connectors, connect, context?.client]);
 
   useEffect(() => {
     const checkClosingTime = () => {
@@ -60,13 +84,17 @@ const Board: React.FC = () => {
         'function selectedNumbers(uint256, uint8) view returns (address)',
         'function currentRound() view returns (uint256)'
       ], provider);
-      const currentRound = await contract.currentRound();
-      const selected = new Set<number>();
-      for (let i = 0; i < 100; i++) {
-        const addr = await contract.selectedNumbers(currentRound, i);
-        if (addr !== ethers.ZeroAddress) selected.add(i);
+      try {
+        const currentRound = await contract.currentRound();
+        const selected = new Set<number>();
+        for (let i = 0; i < 100; i++) {
+          const addr = await contract.selectedNumbers(currentRound, i);
+          if (addr !== ethers.ZeroAddress) selected.add(i);
+        }
+        setSelectedNumbers(selected);
+      } catch (error) {
+        console.error('Fetch selected failed:', error);
       }
-      setSelectedNumbers(selected);
     };
 
     fetchSelected();
@@ -81,7 +109,15 @@ const Board: React.FC = () => {
           console.log('Approve confirmed, selecting number');
           const hash = await selectNumAsync({
             address: contractAddress,
-            abi: ['function selectNumber(uint8)'],
+            abi: [ // Sửa ABI thành object chuẩn
+              {
+                name: 'selectNumber',
+                type: 'function',
+                inputs: [{ name: 'number', type: 'uint8' }],
+                outputs: [],
+                stateMutability: 'nonpayable',
+              },
+            ],
             functionName: 'selectNumber',
             args: [selectedNumber],
           });
@@ -136,13 +172,13 @@ const Board: React.FC = () => {
     setErrorMessage(null);
     console.log('Starting handleConfirm - Chain ID:', chainId, 'Connected:', isConnected);
 
-    if (chainId !== base.id) {  // Changed to base.id for mainnet
+    if (chainId !== base.id) {
       console.log('Switching to Base Mainnet');
       try {
         await switchChain({ chainId: base.id });
       } catch (error: any) {
         console.error('Switch chain failed:', error);
-        setErrorMessage(`Failed to switch chain: ${error.message || 'Unknown error'}`);
+        setErrorMessage(`Failed to switch chain: ${error.message || 'Unknown error. Ensure wallet supports Base mainnet.'}`);
         return;
       }
     }
@@ -167,7 +203,18 @@ const Board: React.FC = () => {
         console.log('Approving USDC');
         const hash = await approveUSDCAsync({
           address: usdcAddress,
-          abi: ['function approve(address spender, uint256 amount) public returns (bool)'],
+          abi: [ // Sửa ABI thành object chuẩn cho USDC approve
+            {
+              name: 'approve',
+              type: 'function',
+              inputs: [
+                { name: 'spender', type: 'address' },
+                { name: 'amount', type: 'uint256' }
+              ],
+              outputs: [{ name: '', type: 'bool' }],
+              stateMutability: 'nonpayable',
+            },
+          ],
           functionName: 'approve',
           args: [contractAddress, BigInt(10000)],
         });
@@ -177,15 +224,23 @@ const Board: React.FC = () => {
         console.log('No approve needed, selecting number');
         const hash = await selectNumAsync({
           address: contractAddress,
-          abi: ['function selectNumber(uint8)'],
+          abi: [ // Sửa ABI thành object chuẩn
+            {
+              name: 'selectNumber',
+              type: 'function',
+              inputs: [{ name: 'number', type: 'uint8' }],
+              outputs: [],
+              stateMutability: 'nonpayable',
+            },
+          ],
           functionName: 'selectNumber',
           args: [selectedNumber],
         });
         setSelectHash(hash);
       }
     } catch (error: any) {
-      console.error('Transaction failed:', error);
-      setErrorMessage(`Transaction failed: ${error.message || 'Unknown error. Check wallet or chain.'}`);
+      console.error('Transaction or query failed:', error);
+      setErrorMessage(`Failed: ${error.message || 'Check if contract is deployed on mainnet and addresses are correct.'}`);
     }
   };
 
