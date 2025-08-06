@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { useAccount, useWriteContract, useChainId, useSwitchChain, useWaitForTransactionReceipt, useConnect } from 'wagmi';
 import { useSignIn } from '@farcaster/auth-kit';
-import { useMiniApp } from '@neynar/react'; // Thêm import này cho auto-connect
-import ApproveModal from './ApproveModal';
-import ShareModal from './ShareModal';
+import { useMiniApp } from '@neynar/react';
+import ShareModal from './ShareModal'; // Giữ ShareModal
 import { base } from 'wagmi/chains';
-import { config } from '@/components/providers/WagmiProvider'; // Sửa đường dẫn import sử dụng alias @/ từ tsconfig.json (baseUrl: ./src, paths: @/* -> ./src/*)
+import { config } from '@/components/providers/WagmiProvider';
+import { SignIn } from '@/components/ui/wallet/SignIn'; // Import SignIn (adjust path nếu khác, dùng alias @/)
 
 const Board: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
@@ -14,12 +14,11 @@ const Board: React.FC = () => {
   const fid = userData?.fid;
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const { connect, connectors } = useConnect(); // Thêm useConnect cho auto-connect
+  const { connect, connectors } = useConnect();
 
-  const { context } = useMiniApp(); // Thêm useMiniApp để lấy context cho auto-connect
+  const { context } = useMiniApp();
 
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
-  const [showApprove, setShowApprove] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [approveHash, setApproveHash] = useState<string | null>(null);
@@ -46,7 +45,7 @@ const Board: React.FC = () => {
     hash: selectHash as `0x${string}` | undefined,
   });
 
-  // Thêm useEffect cho auto-connect wallet, tương tự WalletTab.tsx
+  // Auto-connect useEffect (giữ nguyên, nhưng giờ trigger sau sign-in)
   useEffect(() => {
     const isInFarcasterClient = typeof window !== 'undefined' && 
       (window.location.href.includes('warpcast.com') || 
@@ -57,7 +56,7 @@ const Board: React.FC = () => {
     if (fid && !isConnected && connectors.length > 0 && isInFarcasterClient) {
       console.log("Auto-connecting Farcaster wallet in Board...");
       try {
-        connect({ connector: connectors[0] }); // Connect với farcasterFrame connector
+        connect({ connector: connectors[0] });
       } catch (error) {
         console.error("Auto-connect failed in Board:", error);
         setErrorMessage('Auto-connect wallet failed. Please connect manually.');
@@ -109,7 +108,7 @@ const Board: React.FC = () => {
           console.log('Approve confirmed, selecting number');
           const hash = await selectNumAsync({
             address: contractAddress,
-            abi: [ // Sửa ABI thành object chuẩn
+            abi: [
               {
                 name: 'selectNumber',
                 type: 'function',
@@ -140,7 +139,6 @@ const Board: React.FC = () => {
       console.log('Select confirmed');
       setTxHash(selectHash);
       setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
-      setShowApprove(false);
       setShowShare(true);
 
       if (userAddress && fid) {
@@ -160,7 +158,7 @@ const Board: React.FC = () => {
   const handleSelect = (num: string) => {
     if (isBetClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;
     setSelectedNumber(parseInt(num));
-    setShowApprove(true);
+    handleConfirm(); // Trực tiếp trigger confirm (Farcaster sẽ handle approve/confirm prompt)
   };
 
   const handleConfirm = async () => {
@@ -203,7 +201,7 @@ const Board: React.FC = () => {
         console.log('Approving USDC');
         const hash = await approveUSDCAsync({
           address: usdcAddress,
-          abi: [ // Sửa ABI thành object chuẩn cho USDC approve
+          abi: [
             {
               name: 'approve',
               type: 'function',
@@ -224,7 +222,7 @@ const Board: React.FC = () => {
         console.log('No approve needed, selecting number');
         const hash = await selectNumAsync({
           address: contractAddress,
-          abi: [ // Sửa ABI thành object chuẩn
+          abi: [
             {
               name: 'selectNumber',
               type: 'function',
@@ -243,6 +241,16 @@ const Board: React.FC = () => {
       setErrorMessage(`Failed: ${error.message || 'Check if contract is deployed on mainnet and addresses are correct.'}`);
     }
   };
+
+  // Nếu chưa sign-in (no fid), show SignIn component
+  if (!fid) {
+    return (
+      <div className="p-4 flex flex-col items-center">
+        <p className="text-red-500 mb-4">Please sign in with Farcaster to play.</p>
+        <SignIn />
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -279,7 +287,6 @@ const Board: React.FC = () => {
           Check Results Online
         </a>
       </div>
-      {showApprove && <ApproveModal onApprove={handleConfirm} onClose={() => setShowApprove(false)} />}
       {showShare && <ShareModal onClose={() => setShowShare(false)} selectedNumber={selectedNumber!} txHash={txHash!} />}
     </div>
   );
