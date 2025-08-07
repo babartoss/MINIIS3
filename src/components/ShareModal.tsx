@@ -4,6 +4,7 @@ import { useAccount } from 'wagmi';
 import { useMiniApp } from '@neynar/react';
 import { truncateAddress } from '@/lib/truncateAddress';
 import { ShareButton } from './ui/Share';
+import { ethers } from 'ethers';
 
 const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash: string }> = ({ onClose, selectedNumber, txHash }) => {
   const [round, setRound] = useState(1);
@@ -14,18 +15,41 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
   const username = context?.user?.username;
   const player = username || truncateAddress(address || '');
   const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://your-app-url.vercel.app';
+  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
+  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 
   useEffect(() => {
-    const updateRound = () => {
-      const now = new Date();
-      const start = new Date(now);
-      start.setUTCHours(12, 30, 0, 0);
-      if (now < start) start.setUTCDate(start.getUTCDate() - 1);
-      const daysSinceStart = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      setRound(daysSinceStart);
+    const fetchRound = async () => {
+      if (!contractAddress) {
+        // Fallback to date calculation if no contract
+        const now = new Date();
+        const start = new Date(now);
+        start.setUTCHours(12, 30, 0, 0);
+        if (now < start) start.setUTCDate(start.getUTCDate() - 1);
+        const daysSinceStart = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        setRound(daysSinceStart);
+        return;
+      }
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const contract = new ethers.Contract(contractAddress, ['function currentRound() view returns (uint256)'], provider);
+      try {
+        const currentRound = Number(await contract.currentRound());
+        setRound(currentRound);
+      } catch (error) {
+        console.error('Error fetching round:', error);
+        // Fallback to date calculation on error
+        const now = new Date();
+        const start = new Date(now);
+        start.setUTCHours(12, 30, 0, 0);
+        if (now < start) start.setUTCDate(start.getUTCDate() - 1);
+        const daysSinceStart = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        setRound(daysSinceStart);
+      }
     };
-    updateRound();
+    fetchRound();
+  }, []);
 
+  useEffect(() => {
     const params = `number=${selectedNumber.toString().padStart(2, '0')}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;
     const url = `${baseUrl}/share?${params}`;
     setShareUrl(url);
@@ -46,8 +70,10 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
       <div className="card p-4">
         <h2 className="text-lg font-bold mb-2">Your Ticket</h2>
         <img src={imageUrl} alt="Ticket" className="w-full max-w-[300px] h-auto mb-4" />
-        <ShareButton buttonText="Share on Farcaster" cast={castConfig} />
-        <button onClick={onClose} className="btn btn-secondary mt-2">Close</button>
+        <div className="flex justify-between gap-2">
+          <ShareButton buttonText="Share on Farcaster" cast={castConfig} className="btn btn-primary flex-1" />
+          <button onClick={onClose} className="btn btn-secondary flex-1">Close</button>
+        </div>
       </div>
     </div>
   );
