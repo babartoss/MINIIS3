@@ -1,4 +1,4 @@
-// File: src/components/Results.tsx (Updated with loading spinner during 11:15-11:30 UTC)
+// src/components/Results.tsx
 import React, { useEffect, useState } from 'react';
 
 const Results: React.FC = () => {

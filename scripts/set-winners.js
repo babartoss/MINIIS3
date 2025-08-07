@@ -13,7 +13,7 @@ async function main() {
   const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
   // Nhập thủ công 5 số từ Results.tsx, ví dụ:
-  const winners = [0, 67, 98, 32, 47]; // Array số, không string
+  const winners = [49, 93, 43, 27, 30]; // Array số, không string
   const tx = await contract.setWinningNumbers(winners);
   await tx.wait();
   console.log('Winning numbers set:', winners);

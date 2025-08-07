@@ -1,4 +1,4 @@
-// File: src/components/ParticipantsTab.tsx (Updated with table display)
+// src/components/ParticipantsTab.tsx
 "use client";
 
 import { useEffect, useState } from "react";

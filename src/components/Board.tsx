@@ -21,7 +21,8 @@ const Board: React.FC = () => {
   const [approveHash, setApproveHash] = useState<string | null>(null);
   const [selectHash, setSelectHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isBetClosed, setIsBetClosed] = useState(false);
+  const [isBetClosed, setIsBetClosed] = useState(false); // Thời gian cứng
+  const [isRoundClosed, setIsRoundClosed] = useState(false); // Từ contract
   const [selectedNumbers, setSelectedNumbers] = useState<Set<number>>(new Set());
   const numbers = Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'));
 
@@ -61,6 +62,7 @@ const Board: React.FC = () => {
     }
   }, [fid, isConnected, connectors, connect, context?.client]);
 
+  // Check thời gian đóng
   useEffect(() => {
     const checkClosingTime = () => {
       const now = new Date();
@@ -73,28 +75,26 @@ const Board: React.FC = () => {
     return () => clearInterval(interval);
   }, [betCloseStart, betCloseEnd]);
 
+  // Fetch selectedNumbers và roundClosed
   useEffect(() => {
-    const fetchSelected = async () => {
+    const fetchData = async () => {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
         'function selectedNumbers(uint256, uint8) view returns (address)',
-        'function currentRound() view returns (uint256)'
+        'function currentRound() view returns (uint256)',
+        'function roundClosed(uint256) view returns (bool)'
       ], provider);
-      try {
-        const currentRound = await contract.currentRound();
-        const selected = new Set<number>();
-        for (let i = 0; i < 100; i++) {
-          const addr = await contract.selectedNumbers(currentRound, i);
-          if (addr !== ethers.ZeroAddress) selected.add(i);
-        }
-        setSelectedNumbers(selected);
-      } catch (error) {
-        console.error('Fetch selected failed:', error);
+      const currentRound = await contract.currentRound();
+      setIsRoundClosed(await contract.roundClosed(currentRound));
+      const selected = new Set<number>();
+      for (let i = 0; i < 100; i++) {
+        const addr = await contract.selectedNumbers(currentRound, i);
+        if (addr !== ethers.ZeroAddress) selected.add(i);
       }
+      setSelectedNumbers(selected);
     };
-
-    fetchSelected();
-    const interval = setInterval(fetchSelected, 30000);
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [contractAddress, rpcUrl]);
 
@@ -142,14 +142,14 @@ const Board: React.FC = () => {
   }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash]);
 
   const handleSelect = (num: string) => {
-    if (isBetClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;
+    if (isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;
     setSelectedNumber(parseInt(num));
     handleConfirm(); // Trực tiếp trigger confirm (Farcaster sẽ handle approve/confirm prompt)
   };
 
   const handleConfirm = async () => {
-    if (isBetClosed || !selectedNumber || !userAddress || !isConnected) {
-      setErrorMessage('Wallet not connected or invalid state.');
+    if (isBetClosed || isRoundClosed || !selectedNumber || !userAddress || !isConnected) {
+      setErrorMessage('Bet closed, round ended, or invalid state.');
       return;
     }
 
@@ -247,8 +247,8 @@ const Board: React.FC = () => {
           <button
             key={num}
             onClick={() => handleSelect(num)}
-            className={`aspect-square flex items-center justify-center text-base font-bold rounded-lg relative shadow-md p-1 sm:p-2 ${isBetClosed || selectedNumbers.has(parseInt(num)) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-dark hover:scale-105 active:scale-95 transition-all duration-200'} bg-primary text-white`}
-            disabled={isBetClosed || selectedNumbers.has(parseInt(num)) || !isConnected}
+            className={`aspect-square flex items-center justify-center text-base font-bold rounded-lg relative shadow-md p-1 sm:p-2 ${isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-dark hover:scale-105 active:scale-95 transition-all duration-200'} bg-primary text-white`}
+            disabled={isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected}
           >
             {num}
             {selectedNumbers.has(parseInt(num)) && <span className="absolute top-0 right-0 text-green-500 text-xs sm:text-sm">✅</span>}

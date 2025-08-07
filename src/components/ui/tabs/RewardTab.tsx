@@ -1,4 +1,4 @@
-// File: src/components/RewardTab.tsx (Updated with wagmi integration)
+// src/components/RewardTab.tsx
 "use client";
 
 import { useEffect, useState } from "react";
