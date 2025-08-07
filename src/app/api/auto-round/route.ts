@@ -1,4 +1,3 @@
-// src/app/api/auto-round/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import axios from "axios";
@@ -179,6 +178,27 @@ const ABI = [
     "type": "function"
   },
   {
+    "inputs": [{"internalType": "uint256", "name": "newReward", "type": "uint256"}],
+    "name": "setRewardPerMatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint8[5]", "name": "_winners", "type": "uint8[5]"}],
+    "name": "setWinningNumbers",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "startNewRound",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [{"internalType": "address", "name": "newOwner", "type": "address"}],
     "name": "transferOwnership",
     "outputs": [],
@@ -204,27 +224,6 @@ const ABI = [
     "name": "winningNumbers",
     "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint8[5]", "name": "_winners", "type": "uint8[5]"}],
-    "name": "setWinningNumbers",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "newReward", "type": "uint256"}],
-    "name": "setRewardPerMatch",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "startNewRound",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   }
 ];
@@ -254,9 +253,11 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
 }
 
 export async function GET(request: NextRequest) {
-  const url = new URL(request.url);
-  const secret = url.searchParams.get('secret');
-  if (secret !== process.env.CRON_SECRET) {
+  // Check Bearer token token từ header Authorization
+  const authHeader = request.headers.get('authorization');
+  const token = authHeader ? authHeader.split('Bearer ')[1] : null; // Lấy phần sau 'Bearer '
+
+  if (!token || token !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -320,7 +321,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Auto-round error:', error);
-    // Optional: Gửi alert cho owner (email/Slack) nếu có lib
     return NextResponse.json({ error: 'Failed to run auto-round' }, { status: 500 });
   }
 }
