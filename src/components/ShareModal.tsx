@@ -35,8 +35,7 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
   const castConfig = {
     text: `I just picked number ${selectedNumber.toString().padStart(2, '0')} in MINIIS3 Round ${round}!`,
     embeds: [
-      shareUrl,
-      process.env.NEXT_PUBLIC_URL || 'https://your-app-url.vercel.app'
+      shareUrl
     ],
   };
 
