@@ -1,10 +1,4 @@
-// Modified: src/components/ShareModal.tsx
-// Changes:
-// - Removed contract from modal display and shareUrl (since removed from image)
-// - Updated player to `${player}/${selectedNumber.toString().padStart(2, '0')}` for PLAYER/NUMBER
-// - Removed Transaction from modal if not needed, but kept for consistency
-// - Updated shareUrl params to remove contract
-
+// src/components/ShareModal.tsx
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { useMiniApp } from '@neynar/react';
@@ -14,11 +8,11 @@ import { ShareButton } from './ui/Share';
 const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash: string }> = ({ onClose, selectedNumber, txHash }) => {
   const [round, setRound] = useState(1);
   const [shareUrl, setShareUrl] = useState<string>('');
+  const [imageUrl, setImageUrl] = useState<string>('');
   const { address } = useAccount();
   const { context } = useMiniApp();
   const username = context?.user?.username;
   const player = username || truncateAddress(address || '');
-  const playerNumber = `${player}/${selectedNumber.toString().padStart(2, '0')}`;
 
   useEffect(() => {
     const updateRound = () => {
@@ -33,6 +27,9 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
 
     const url = `/share?number=${selectedNumber.toString().padStart(2, '0')}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;
     setShareUrl(url);
+
+    const imgUrl = `/api/ticket-image?number=${selectedNumber.toString().padStart(2, '0')}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;
+    setImageUrl(imgUrl);
   }, [selectedNumber, round, player, txHash]);
 
   const castConfig = {
@@ -47,9 +44,7 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ backgroundImage: `url(/ticket-background.png)` }}>
       <div className="card p-4">
         <h2 className="text-lg font-bold mb-2">Your Ticket</h2>
-        <p>Player/Number: {playerNumber}</p>
-        <p>Round: {round}</p>
-        <p>Transaction: {truncateAddress(txHash, 6, 7)}</p>
+        <img src={imageUrl} alt="Ticket" className="w-full max-w-[300px] h-auto mb-4" />
         <ShareButton buttonText="Share on Farcaster" cast={castConfig} />
         <button onClick={onClose} className="btn btn-secondary mt-2">Close</button>
       </div>

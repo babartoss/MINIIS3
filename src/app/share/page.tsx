@@ -1,3 +1,4 @@
+// src/app/share/page.tsx
 import { Metadata, ResolvingMetadata } from 'next';
 import ClientSharePage from './ClientSharePage';
 

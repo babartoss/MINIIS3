@@ -1,3 +1,4 @@
+// src/components/Board.tsx
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { useAccount, useWriteContract, useChainId, useSwitchChain, useWaitForTransactionReceipt, useConnect } from 'wagmi';
@@ -124,7 +125,6 @@ const Board: React.FC = () => {
         }
       })();
     } else if (approveHash && approveReceipt.isError) {
-      console.error('Approve tx failed');
       setErrorMessage('Approve transaction failed.');
       setApproveHash(null);
     }
@@ -132,24 +132,14 @@ const Board: React.FC = () => {
 
   useEffect(() => {
     if (selectHash && selectReceipt.isSuccess) {
-      console.log('Select confirmed');
       setTxHash(selectHash);
-      setSelectedNumbers(prev => new Set([...prev, selectedNumber!]));
       setShowShare(true);
-
-      if (userAddress && fid) {
-        fetch('/api/record-selection', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fid, address: userAddress }),
-        }).then(() => console.log('Mapping recorded')).catch(error => console.error('Record error:', error));
-      }
       setSelectHash(null);
     } else if (selectHash && selectReceipt.isError) {
       setErrorMessage('Select transaction failed.');
       setSelectHash(null);
     }
-  }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash, selectedNumber, userAddress, fid]);
+  }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash]);
 
   const handleSelect = (num: string) => {
     if (isBetClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;

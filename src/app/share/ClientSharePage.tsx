@@ -1,7 +1,4 @@
-// Modified: src/app/share/ClientSharePage.tsx
-// Changes:
-// - Removed contract from display
-
+// src/app/share/ClientSharePage.tsx
 'use client';
 
 import { useState, useEffect } from 'react';

@@ -1,17 +1,4 @@
-// Modified: src/app/api/ticket-image/route.tsx
-// Changes:
-// - Removed BET AMOUNT and BET TYPE spans completely
-// - Adjusted positions based on new ticket layout (estimated from image):
-//   - TRANSACTION: top 30px, left 100px
-//   - PLAYER/NUMBER: top 60px, left 100px (player / number)
-//   - ROUND OF PLAY: top 120px, left 100px (round)
-//   - DATE/TIME: top 150px, left 100px (currentTime)
-//   - Number in circle: top 60px, left 30px, font 40px
-// - Removed contract span (not mentioned in new layout)
-// - Updated player/number to `${player}/${number}` in one span
-// - Kept randomOffset and randomRotate for slight variation
-// - Dimensions kept at 300x200; adjust if image size differs
-
+// src/app/api/ticket-image/route.tsx
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 
@@ -57,11 +44,11 @@ export async function GET(request: NextRequest) {
           fontWeight: 'bold',
         }}
       >
-        <span style={{ position: 'absolute', top: `${randomOffset(30)}px`, left: `${randomOffset(100)}px`, fontSize: '15px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{truncatedHash}</span>
-        <span style={{ position: 'absolute', top: `${randomOffset(60)}px`, left: `${randomOffset(100)}px`, fontSize: '16px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{playerNumber}</span>
-        <span style={{ position: 'absolute', top: `${randomOffset(120)}px`, left: `${randomOffset(100)}px`, fontSize: '16px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{round}</span>
-        <span style={{ position: 'absolute', top: `${randomOffset(150)}px`, left: `${randomOffset(100)}px`, fontSize: '12px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{currentTime}</span>
-        <span style={{ position: 'absolute', top: `${randomOffset(60)}px`, left: `${randomOffset(30)}px`, fontSize: '40px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{number}</span>
+        <span style={{ position: 'absolute', top: `${randomOffset(57)}px`, left: `${randomOffset(131)}px`, fontSize: '15px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{truncatedHash}</span>
+        <span style={{ position: 'absolute', top: `${randomOffset(82)}px`, left: `${randomOffset(150)}px`, fontSize: '16px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{playerNumber}</span>
+        <span style={{ position: 'absolute', top: `${randomOffset(124)}px`, left: `${randomOffset(172)}px`, fontSize: '16px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{round}</span>
+        <span style={{ position: 'absolute', top: `${randomOffset(144)}px`, left: `${randomOffset(130)}px`, fontSize: '12px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{currentTime}</span>
+        <span style={{ position: 'absolute', top: `${randomOffset(101)}px`, left: `${randomOffset(62)}px`, fontSize: '30px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{number}</span>
       </div>,
       { width: 300, height: 200 }
     );
@@ -83,11 +70,11 @@ export async function GET(request: NextRequest) {
         fontWeight: 'bold',
       }}
     >
-      <span style={{ position: 'absolute', top: `${randomOffset(30)}px`, left: `${randomOffset(100)}px`, fontSize: '15px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{truncatedHash}</span>
-      <span style={{ position: 'absolute', top: `${randomOffset(60)}px`, left: `${randomOffset(100)}px`, fontSize: '16px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{playerNumber}</span>
-      <span style={{ position: 'absolute', top: `${randomOffset(120)}px`, left: `${randomOffset(100)}px`, fontSize: '16px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{round}</span>
-      <span style={{ position: 'absolute', top: `${randomOffset(150)}px`, left: `${randomOffset(100)}px`, fontSize: '12px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{currentTime}</span>
-      <span style={{ position: 'absolute', top: `${randomOffset(60)}px`, left: `${randomOffset(30)}px`, fontSize: '40px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{number}</span>
+      <span style={{ position: 'absolute', top: `${randomOffset(57)}px`, left: `${randomOffset(131)}px`, fontSize: '15px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{truncatedHash}</span>
+      <span style={{ position: 'absolute', top: `${randomOffset(82)}px`, left: `${randomOffset(150)}px`, fontSize: '16px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{playerNumber}</span>
+      <span style={{ position: 'absolute', top: `${randomOffset(124)}px`, left: `${randomOffset(172)}px`, fontSize: '16px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{round}</span>
+      <span style={{ position: 'absolute', top: `${randomOffset(144)}px`, left: `${randomOffset(130)}px`, fontSize: '12px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{currentTime}</span>
+      <span style={{ position: 'absolute', top: `${randomOffset(101)}px`, left: `${randomOffset(62)}px`, fontSize: '30px', textShadow: '1px 1px 2px rgba(0,0,0,0.3)', opacity: 0.9, transform: `rotate(${randomRotate()}deg)` }}>{number}</span>
     </div>,
     {
       width: 300,
