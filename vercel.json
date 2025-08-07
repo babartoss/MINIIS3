@@ -4,7 +4,7 @@
   "crons": [
     {
       "path": "/api/auto-round?secret=${CRON_SECRET}",
-      "schedule": "30 11 * * *"
+      "schedule": "35 11 * * *"
     }
   ]
 }
