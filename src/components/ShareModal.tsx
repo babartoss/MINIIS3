@@ -13,6 +13,7 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
   const { context } = useMiniApp();
   const username = context?.user?.username;
   const player = username || truncateAddress(address || '');
+  const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://your-app-url.vercel.app';
 
   useEffect(() => {
     const updateRound = () => {
@@ -25,10 +26,11 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
     };
     updateRound();
 
-    const url = `/share?number=${selectedNumber.toString().padStart(2, '0')}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;
+    const params = `number=${selectedNumber.toString().padStart(2, '0')}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;
+    const url = `${baseUrl}/share?${params}`;
     setShareUrl(url);
 
-    const imgUrl = `/api/ticket-image?number=${selectedNumber.toString().padStart(2, '0')}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;
+    const imgUrl = `${baseUrl}/api/ticket-image?${params}`;
     setImageUrl(imgUrl);
   }, [selectedNumber, round, player, txHash]);
 
