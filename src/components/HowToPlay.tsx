@@ -1,30 +1,6 @@
-// File: src/components/HowToPlay.tsx (Updated)
 import React from 'react';
-import { useQuickAuth } from '@/hooks/useQuickAuth'; // Assume hook path, adjust if different
 
 const HowToPlay: React.FC<{ onTryLuck: () => void }> = ({ onTryLuck }) => {
-  const { authenticatedUser, status, signIn } = useQuickAuth(); // Removed signOut as it's unused
-  const fid = authenticatedUser?.fid; // Get fid from authenticatedUser
-
-  const handleTryLuck = async () => {
-    if (status !== 'authenticated' || !fid) {
-      try {
-        const success = await signIn();
-        if (success) {
-          onTryLuck(); // Proceed to board after successful sign-in
-        } else {
-          console.error('Sign-in failed');
-          // Optionally show error message in UI
-        }
-      } catch (error) {
-        console.error('Sign-in error:', error);
-        // Handle error, e.g., show toast or alert
-      }
-    } else {
-      onTryLuck(); // Already signed in, proceed directly
-    }
-  };
-
   return (
     <div 
       className="container py-4 text-center relative"
@@ -69,7 +45,7 @@ const HowToPlay: React.FC<{ onTryLuck: () => void }> = ({ onTryLuck }) => {
           • Players whose number matches any of the 5 red numbers on the result board will be considered winners<br />
           • If your number hits, you’ll receive 0.20 USDC
         </p>
-        <button onClick={handleTryLuck} className="btn btn-primary mt-4">
+        <button onClick={onTryLuck} className="btn btn-primary mt-4">
           TRY YOUR LUCK
         </button>
       </div>

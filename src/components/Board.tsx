@@ -1,21 +1,18 @@
-// File: src/components/Board.tsx (Revert to version without SignIn, as moved to HowToPlay, and remove unused config import)
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { useAccount, useWriteContract, useChainId, useSwitchChain, useWaitForTransactionReceipt, useConnect } from 'wagmi';
-import { useSignIn } from '@farcaster/auth-kit';
 import { useMiniApp } from '@neynar/react';
 import ShareModal from './ShareModal'; // Giữ ShareModal
 import { base } from 'wagmi/chains';
 
 const Board: React.FC = () => {
   const { address: userAddress, isConnected } = useAccount();
-  const { data: userData } = useSignIn({});
-  const fid = userData?.fid;
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const { connect, connectors } = useConnect();
 
   const { context } = useMiniApp();
+  const fid = context?.user?.fid; // Thay nguồn FID từ context (inherit từ Farcaster client, không cần explicit sign-in)
 
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
   const [showShare, setShowShare] = useState(false);
@@ -44,7 +41,7 @@ const Board: React.FC = () => {
     hash: selectHash as `0x${string}` | undefined,
   });
 
-  // Auto-connect useEffect (giữ nguyên, nhưng giờ trigger sau sign-in)
+  // Auto-connect useEffect (trigger nếu có FID từ context)
   useEffect(() => {
     const isInFarcasterClient = typeof window !== 'undefined' && 
       (window.location.href.includes('warpcast.com') || 
@@ -256,7 +253,7 @@ const Board: React.FC = () => {
     >
       {errorMessage && <div className="bg-red-500 text-white p-2 mb-4 rounded">{errorMessage}</div>}
       <div className="grid grid-cols-10 gap-1 sm:gap-2 auto-rows-fr max-w-[640px] mx-auto mb-4">
-        {numbers.map((num) => (
+        {numbers.map(num => (
           <button
             key={num}
             onClick={() => handleSelect(num)}
