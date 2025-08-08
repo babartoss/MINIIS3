@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/auto-round",
-      "schedule": "45 11 * * *"
+      "schedule": "08 16 * * *"
     }
   ],
   "functions": {
