@@ -24,6 +24,7 @@ const Board: React.FC = () => {
   const [isBetClosed, setIsBetClosed] = useState(false); // Thời gian cứng
   const [isRoundClosed, setIsRoundClosed] = useState(false); // Từ contract
   const [selectedNumbers, setSelectedNumbers] = useState<Set<number>>(new Set());
+  const [currentRound, setCurrentRound] = useState<number>(0);
   const numbers = Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'));
 
   const contractAddress = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '') as `0x${string}`;
@@ -62,6 +63,17 @@ const Board: React.FC = () => {
     }
   }, [fid, isConnected, connectors, connect, context?.client]);
 
+  // Set address-FID mapping after connection
+  useEffect(() => {
+    if (isConnected && fid && userAddress) {
+      fetch('/api/set-address-fid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: userAddress, fid }),
+      }).catch(err => console.error('Failed to set address-FID mapping:', err));
+    }
+  }, [isConnected, fid, userAddress]);
+
   // Check thời gian đóng
   useEffect(() => {
     const checkClosingTime = () => {
@@ -75,7 +87,7 @@ const Board: React.FC = () => {
     return () => clearInterval(interval);
   }, [betCloseStart, betCloseEnd]);
 
-  // Fetch selectedNumbers và roundClosed
+  // Fetch selectedNumbers, roundClosed, and currentRound
   useEffect(() => {
     const fetchData = async () => {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -84,11 +96,12 @@ const Board: React.FC = () => {
         'function currentRound() view returns (uint256)',
         'function roundClosed(uint256) view returns (bool)'
       ], provider);
-      const currentRound = await contract.currentRound();
-      setIsRoundClosed(await contract.roundClosed(currentRound));
+      const currRound = await contract.currentRound();
+      setCurrentRound(Number(currRound));
+      setIsRoundClosed(await contract.roundClosed(currRound));
       const selected = new Set<number>();
       for (let i = 0; i < 100; i++) {
-        const addr = await contract.selectedNumbers(currentRound, i);
+        const addr = await contract.selectedNumbers(currRound, i);
         if (addr !== ethers.ZeroAddress) selected.add(i);
       }
       setSelectedNumbers(selected);
@@ -132,6 +145,16 @@ const Board: React.FC = () => {
 
   useEffect(() => {
     if (selectHash && selectReceipt.isSuccess) {
+      const timestamp = new Date().toLocaleString();
+      const title = "Bet Placed Successfully!";
+      const body = `You selected number ${selectedNumber?.toString().padStart(2, '0')} for round ${currentRound} at ${timestamp}`;
+
+      fetch('/api/send-custom-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid, title, body }),
+      }).catch(err => console.error('Send notification failed:', err));
+
       setTxHash(selectHash);
       setShowShare(true);
       setSelectHash(null);
@@ -139,7 +162,7 @@ const Board: React.FC = () => {
       setErrorMessage('Select transaction failed.');
       setSelectHash(null);
     }
-  }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash]);
+  }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash, selectedNumber, currentRound, fid]);
 
   const handleSelect = (num: string) => {
     if (isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;

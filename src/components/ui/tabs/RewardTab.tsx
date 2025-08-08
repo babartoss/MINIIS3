@@ -65,7 +65,9 @@ export function RewardTab() {
           }
         }
       }
-      setRewards(userRewards);
+      // Sort by round descending and limit to last 10 rounds
+      userRewards.sort((a, b) => b.round - a.round);
+      setRewards(userRewards.slice(0, 10));
     };
 
     fetchRewards();

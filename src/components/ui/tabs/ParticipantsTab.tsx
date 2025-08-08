@@ -30,11 +30,43 @@ export function ParticipantsTab() {
         const timestamp = new Date(block.timestamp * 1000).toLocaleString(); // Format nicer: local time
         return {
           number: parsedLog.args[2].toString().padStart(2, '0'),
-          user: truncateAddress(parsedLog.args[1]), // Truncate user address for brevity (add truncate function if needed)
+          user: parsedLog.args[1], // Keep full address initially
           timestamp,
         };
       });
-      const parts = (await Promise.all(partsPromises)).filter(Boolean) as { number: string; user: string; timestamp: string }[]; // Remove nulls
+      let parts = (await Promise.all(partsPromises)).filter(Boolean) as { number: string; user: string; timestamp: string }[]; // Remove nulls
+
+      // Fetch usernames via Neynar if FID mapping exists
+      const addresses = [...new Set(parts.map(p => p.user.toLowerCase()))];
+      const fidsResponse = await fetch('/api/get-fids', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses }),
+      });
+      const fidsMap = await fidsResponse.json();
+
+      const fids = Object.values(fidsMap).filter((fid: any) => fid);
+      let usersMap: { [key: number]: { username: string; display_name: string } } = {}; // <-- Fix applied here
+      if (fids.length > 0) {
+        const usersResponse = await fetch('/api/get-users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fids }),
+        });
+        usersMap = await usersResponse.json();
+      }
+
+      parts = parts.map(part => {
+        const fid = fidsMap[part.user.toLowerCase()];
+        if (fid) {
+          const userInfo = usersMap[fid];
+          part.user = userInfo?.username ? `@${userInfo.username}` : truncateAddress(part.user);
+        } else {
+          part.user = truncateAddress(part.user);
+        }
+        return part;
+      });
+
       // Sort by number ascending
       parts.sort((a, b) => parseInt(a.number) - parseInt(b.number));
       setParticipants(parts);
