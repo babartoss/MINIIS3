@@ -79,7 +79,9 @@ const Board: React.FC = () => {
     const checkClosingTime = () => {
       const now = new Date();
       const utcHour = now.getUTCHours();
-      setIsBetClosed(utcHour >= betCloseStart && utcHour < betCloseEnd);
+      const betClosed = utcHour >= betCloseStart && utcHour < betCloseEnd;
+      setIsBetClosed(betClosed);
+      console.log('Bet Closed Status:', betClosed, 'UTC Hour:', utcHour); // Debug bet closed
     };
 
     checkClosingTime();
@@ -98,7 +100,9 @@ const Board: React.FC = () => {
       ], provider);
       const currRound = await contract.currentRound();
       setCurrentRound(Number(currRound));
-      setIsRoundClosed(await contract.roundClosed(currRound));
+      const roundClosed = await contract.roundClosed(currRound);
+      setIsRoundClosed(roundClosed);
+      console.log('Round Closed Status:', roundClosed, 'Current Round:', currRound); // Debug round closed
       const selected = new Set<number>();
       for (let i = 0; i < 100; i++) {
         const addr = await contract.selectedNumbers(currRound, i);
@@ -165,13 +169,18 @@ const Board: React.FC = () => {
   }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash, selectedNumber, currentRound, fid]);
 
   const handleSelect = (num: string) => {
-    if (isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;
-    setSelectedNumber(parseInt(num));
+    const parsedNum = parseInt(num);
+    if (isBetClosed || isRoundClosed || selectedNumbers.has(parsedNum) || !isConnected) {
+      console.log('Select blocked:', { isBetClosed, isRoundClosed, isSelected: selectedNumbers.has(parsedNum), isConnected }); // Debug why blocked
+      return;
+    }
+    setSelectedNumber(parsedNum);
     handleConfirm(); // Trực tiếp trigger confirm (Farcaster sẽ handle approve/confirm prompt)
   };
 
   const handleConfirm = async () => {
     if (isBetClosed || isRoundClosed || !selectedNumber || !userAddress || !isConnected) {
+      console.log('Confirm blocked:', { isBetClosed, isRoundClosed, selectedNumber, userAddress, isConnected }); // Debug confirm block
       setErrorMessage('Bet closed, round ended, or invalid state.');
       return;
     }
