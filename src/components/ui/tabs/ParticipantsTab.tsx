@@ -10,8 +10,8 @@ export function ParticipantsTab() {
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
   const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 
-  useEffect(() => {
-    const fetchParticipants = async () => {
+  const fetchParticipants = async () => {
+    try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
         'event NumberSelected(uint256 round, address selector, uint8 number)',
@@ -19,8 +19,8 @@ export function ParticipantsTab() {
       ], provider);
       const currentRound = await contract.currentRound();
       const latestBlock = await provider.getBlockNumber();
-      const fromBlock = latestBlock - 50000; // ~1-2 days, covers full round
-      const filter = contract.filters.NumberSelected(null);
+      const fromBlock = latestBlock - 100000; // Tăng phạm vi lên ~2 ngày để bao quát các event cũ hơn
+      const filter = contract.filters.NumberSelected(); // Sửa lỗi: loại bỏ (null) vì event không có indexed params
       const events = await contract.queryFilter(filter, fromBlock, 'latest');
       const partsPromises = events.map(async (event) => {
         const parsedLog = contract.interface.parseLog(event);
@@ -38,21 +38,29 @@ export function ParticipantsTab() {
 
       // Fetch usernames via Neynar if FID mapping exists
       const addresses = [...new Set(parts.map(p => p.user.toLowerCase()))];
+      console.log('Fetching fids for addresses:', addresses); // Debug log để kiểm tra trong browser console
       const fidsResponse = await fetch('/api/get-fids', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addresses }),
       });
+      if (!fidsResponse.ok) {
+        throw new Error(`Failed to fetch fids: ${fidsResponse.statusText}`);
+      }
       const fidsMap = await fidsResponse.json();
 
       const fids = Object.values(fidsMap).filter((fid: any) => fid);
-      let usersMap: { [key: number]: { username: string; display_name: string } } = {}; // <-- Fix applied here
+      let usersMap: { [key: number]: { username: string; display_name: string } } = {};
       if (fids.length > 0) {
+        console.log('Fetching users for fids:', fids); // Debug log
         const usersResponse = await fetch('/api/get-users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fids }),
         });
+        if (!usersResponse.ok) {
+          throw new Error(`Failed to fetch users: ${usersResponse.statusText}`);
+        }
         usersMap = await usersResponse.json();
       }
 
@@ -70,9 +78,16 @@ export function ParticipantsTab() {
       // Sort by number ascending
       parts.sort((a, b) => parseInt(a.number) - parseInt(b.number));
       setParticipants(parts);
-    };
+    } catch (error) {
+      console.error('Error fetching participants:', error);
+      setParticipants([]); // Reset to empty on error to show "No selections" message
+    }
+  };
 
+  useEffect(() => {
     fetchParticipants();
+    const interval = setInterval(fetchParticipants, 30000); // Cập nhật tự động mỗi 30 giây để đồng bộ dữ liệu mới
+    return () => clearInterval(interval);
   }, [contractAddress, rpcUrl]);
 
   // Helper to truncate address (add to lib if not exist)
