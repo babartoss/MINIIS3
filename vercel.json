@@ -1,10 +1,13 @@
 {
-  "buildCommand": "next build",
-  "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/auto-round?secret=${CRON_SECRET}",
-      "schedule": "35 11 * * *"
+      "path": "/api/auto-round",
+      "schedule": "45 11 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/auto-round/route.ts": {
+      "maxDuration": 60 // Timeout 60s for Puppeteer
+    }
+  }
 }

@@ -1,3 +1,4 @@
+// File: miniis3\src\app\api\auto-round\route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import axios from "axios";
@@ -236,12 +237,19 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const response = await axios.get('https://www.minhngoc.net.vn/ket-qua-xo-so/mien-bac.html', {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+        headers: { 
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Referer': 'https://www.google.com/'
+        }
       });
       const $ = cheerio.load(response.data);
-      const dbNumber = $('table.bkqmienbac tr:nth-child(2) td:nth-child(2)').text().trim().slice(-2) || '';
-      const g7Numbers = $('table.bkqmienbac tr:nth-child(9) td:nth-child(2)').text().trim().split(/\s+|-/).filter(n => n.trim() !== '') || [];
-      const numbers = [...g7Numbers.slice(0, 4), dbNumber].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n < 100);
+      const dbText = $('table.bkqmienbac tr:nth-child(2) td:nth-child(2)').text().trim();
+      const dbNumber = dbText.slice(-2);
+      const g7Text = $('table.bkqmienbac tr:nth-child(9) td:nth-child(2)').text().trim();
+      const g7Numbers = g7Text.split(/\s+|-/).filter(n => n.trim().length === 2 && /^\d{2}$/.test(n.trim()));
+      const numbers = [...g7Numbers, dbNumber].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n < 100);
       if (numbers.length === 5) return numbers;
       console.log(`Attempt ${attempt + 1} failed: Invalid numbers`, numbers);
       await new Promise(resolve => setTimeout(resolve, 300000)); // Wait 5 min before retry
@@ -253,15 +261,15 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
 }
 
 export async function GET(request: NextRequest) {
-  // Check Bearer token token từ header Authorization
+  // Check Bearer token from header Authorization
   const authHeader = request.headers.get('authorization');
-  const token = authHeader ? authHeader.split('Bearer ')[1] : null; // Lấy phần sau 'Bearer '
+  const token = authHeader ? authHeader.split('Bearer ')[1] : null; // Get part after 'Bearer '
 
   if (!token || token !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check thời gian: Chỉ chạy nếu sau 11:30 UTC
+  // Check time: Only run if after 11:30 UTC
   const now = new Date();
   const utcHour = now.getUTCHours();
   const utcMinute = now.getUTCMinutes();
@@ -286,7 +294,7 @@ export async function GET(request: NextRequest) {
       await txSet.wait();
       console.log(`Round ${currentRound} closed with winners: ${winners}`);
 
-      // Lọc winners và notify
+      // Filter winners and notify
       const winningSet = new Set(winners);
       const winnersMap = new Map<string, number>();
       for (let num = 0; num < 100; num++) {
@@ -312,11 +320,15 @@ export async function GET(request: NextRequest) {
           console.log(`No FID for address ${addr}`);
         }
       }
-    }
 
-    const txStart = await contract.startNewRound();
-    await txStart.wait();
-    console.log('New round started');
+      // Start new round only after closing the current one
+      const txStart = await contract.startNewRound();
+      await txStart.wait();
+      console.log('New round started');
+    } else {
+      console.log(`Round ${currentRound} already closed, skipping.`);
+      return NextResponse.json({ success: false, message: 'Round already closed' });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
