@@ -242,7 +242,10 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
         headless: true,
       });
       const page = await browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
       await page.goto('https://www.minhngoc.net.vn/ket-qua-xo-so/mien-bac.html', { waitUntil: 'networkidle2' });
+      await page.waitForSelector('table.bkqmienbac', { timeout: 30000 }); // Wait for table to be present
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Additional buffer for JS to populate
 
       const dbText = await page.evaluate(() => document.querySelector('table.bkqmienbac tr:nth-child(2) td:nth-child(2)')?.textContent?.trim() || '');
       const g7Text = await page.evaluate(() => document.querySelector('table.bkqmienbac tr:nth-child(9) td:nth-child(2)')?.textContent?.trim() || '');
