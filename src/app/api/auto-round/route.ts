@@ -1,8 +1,8 @@
 // File: miniis3\src\app\api\auto-round\route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
-import axios from "axios";
-import * as cheerio from "cheerio";
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { sendNeynarMiniAppNotification } from "~/lib/neynar";
 import { getFidByAddress } from "~/lib/kv";
 
@@ -236,25 +236,27 @@ const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY || '';
 async function fetchWinningNumbers(retries = 3): Promise<number[]> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const response = await axios.get('https://www.minhngoc.net.vn/ket-qua-xo-so/mien-bac.html', {
-        headers: { 
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Referer': 'https://www.google.com/'
-        }
+      const browser = await puppeteer.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath(),
+        headless: true,
       });
-      const $ = cheerio.load(response.data);
-      const dbText = $('table.bkqmienbac tr:nth-child(2) td:nth-child(2)').text().trim();
+      const page = await browser.newPage();
+      await page.goto('https://www.minhngoc.net.vn/ket-qua-xo-so/mien-bac.html', { waitUntil: 'networkidle2' });
+
+      const dbText = await page.evaluate(() => document.querySelector('table.bkqmienbac tr:nth-child(2) td:nth-child(2)')?.textContent?.trim() || '');
+      const g7Text = await page.evaluate(() => document.querySelector('table.bkqmienbac tr:nth-child(9) td:nth-child(2)')?.textContent?.trim() || '');
+
       const dbNumber = dbText.slice(-2);
-      const g7Text = $('table.bkqmienbac tr:nth-child(9) td:nth-child(2)').text().trim();
       const g7Numbers = g7Text.split(/\s+|-/).filter(n => n.trim().length === 2 && /^\d{2}$/.test(n.trim()));
       const numbers = [...g7Numbers, dbNumber].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n < 100);
+
+      await browser.close();
       if (numbers.length === 5) return numbers;
       console.log(`Attempt ${attempt + 1} failed: Invalid numbers`, numbers);
-      await new Promise(resolve => setTimeout(resolve, 300000)); // Wait 5 min before retry
+      await new Promise(resolve => setTimeout(resolve, 300000)); // 5 min retry
     } catch (error) {
-      console.error('Fetch error:', error);
+      console.error('Puppeteer error:', error);
     }
   }
   return [];
@@ -263,7 +265,7 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
 export async function GET(request: NextRequest) {
   // Check Bearer token from header Authorization
   const authHeader = request.headers.get('authorization');
-  const token = authHeader ? authHeader.split('Bearer ')[1] : null; // Get part after 'Bearer '
+  const token = authHeader ? authHeader.split('Bearer ')[1] : null;
 
   if (!token || token !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
