@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { ethers } from 'ethers';
 
 export function ParticipantsTab() {
-  const [participants, setParticipants] = useState<{ number: string; user: string; timestamp: string }[]>([]);
+  const [participants, setParticipants] = useState<{ number: string; user: string; round: string }[]>([]);
+  const [currentRound, setCurrentRound] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
@@ -15,32 +16,25 @@ export function ParticipantsTab() {
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
-        'event NumberSelected(uint256 round, address selector, uint8 number)',
         'function currentRound() view returns (uint256)',
         'function selectedNumbers(uint256 round, uint8 number) view returns (address)'
       ], provider);
-      const currentRound = Number(await contract.currentRound());
+      const round = Number(await contract.currentRound());
+      setCurrentRound(round);
 
-      // Use mapping to fetch
-      const parts = [];
-      for (let num = 0; num < 100; num++) {
-        const addr = await contract.selectedNumbers(currentRound, num);
-        if (addr !== ethers.ZeroAddress) {
-          const latestBlock = await provider.getBlock('latest');
-          let timestamp = '-';
-          if (latestBlock) {
-            timestamp = new Date(latestBlock.timestamp * 1000).toLocaleString();
-          }
-          parts.push({ number: num.toString().padStart(2, '0'), user: addr, timestamp });
-        }
-      }
+      // Batch fetch selectedNumbers to reduce calls (Promise.all for 100 nums)
+      const numPromises = Array.from({ length: 100 }, (_, num) => contract.selectedNumbers(round, num));
+      const addresses = await Promise.all(numPromises);
+      const parts = addresses
+        .map((addr, num) => addr !== ethers.ZeroAddress ? { number: num.toString().padStart(2, '0'), user: addr, round: round.toString() } : null)
+        .filter(Boolean) as { number: string; user: string; round: string }[];
 
       // Fetch FID and usernames
-      const addresses = [...new Set(parts.map(p => p.user.toLowerCase()))];
+      const uniqueAddresses = [...new Set(parts.map(p => p.user.toLowerCase()))];
       const fidsResponse = await fetch('/api/get-fids', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses }),
+        body: JSON.stringify({ addresses: uniqueAddresses }),
       });
       if (!fidsResponse.ok) throw new Error('Failed to fetch fids');
       const fidsMap = await fidsResponse.json();
@@ -90,7 +84,7 @@ export function ParticipantsTab() {
     return {
       number: num,
       user: part ? part.user : 'Available',
-      timestamp: part ? part.timestamp : '-',
+      round: part ? part.round : '-',
     };
   });
 
@@ -103,7 +97,7 @@ export function ParticipantsTab() {
           <tr className="bg-primary text-white">
             <th className="px-4 py-2 border-b">Number</th>
             <th className="px-4 py-2 border-b">Player</th>
-            <th className="px-4 py-2 border-b">Purchase Time</th>
+            <th className="px-4 py-2 border-b">Round</th>
           </tr>
         </thead>
         <tbody>
@@ -111,7 +105,7 @@ export function ParticipantsTab() {
             <tr key={index} className={`${index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : ''} hover:bg-gray-200 dark:hover:bg-gray-600`}>
               <td className="px-4 py-2 border-b text-center font-bold">{item.number}</td>
               <td className="px-4 py-2 border-b text-center">{item.user}</td>
-              <td className="px-4 py-2 border-b text-center text-sm text-gray-600 dark:text-gray-400">{item.timestamp}</td>
+              <td className="px-4 py-2 border-b text-center text-sm text-gray-600 dark:text-gray-400">{item.round}</td>
             </tr>
           ))}
         </tbody>
