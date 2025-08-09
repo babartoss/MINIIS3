@@ -245,7 +245,14 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
       await page.goto('https://www.minhngoc.net.vn/ket-qua-xo-so/mien-bac.html', { waitUntil: 'networkidle2' });
       await page.waitForSelector('table.bkqmienbac', { timeout: 30000 }); // Wait for table to be present
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Additional buffer for JS to populate
+
+      // Wait for G7 text to have content (JS populate)
+      await page.waitForFunction(() => {
+        const elem = document.querySelector('table.bkqmienbac tr:nth-child(9) td:nth-child(2)');
+        return elem && elem.textContent && elem.textContent.trim().length > 0;
+      }, { timeout: 30000 });
+
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Additional buffer if needed
 
       const dbText = await page.evaluate(() => document.querySelector('table.bkqmienbac tr:nth-child(2) td:nth-child(2)')?.textContent?.trim() || '');
       const g7Text = await page.evaluate(() => document.querySelector('table.bkqmienbac tr:nth-child(9) td:nth-child(2)')?.textContent?.trim() || '');
@@ -325,15 +332,12 @@ export async function GET(request: NextRequest) {
           console.log(`No FID for address ${addr}`);
         }
       }
-
-      // Start new round only after closing the current one
-      const txStart = await contract.startNewRound();
-      await txStart.wait();
-      console.log('New round started');
-    } else {
-      console.log(`Round ${currentRound} already closed, skipping.`);
-      return NextResponse.json({ success: false, message: 'Round already closed' });
     }
+
+    // Always start new round (if closed or after close)
+    const txStart = await contract.startNewRound();
+    await txStart.wait();
+    console.log('New round started');
 
     return NextResponse.json({ success: true });
   } catch (error) {
