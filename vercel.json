@@ -1,13 +1,13 @@
 {
-  "crons": [
-    {
-      "path": "/api/auto-round",
-      "schedule": "43 11 * * *"
-    }
-  ],
-  "functions": {
-    "api/auto-round/route.ts": {
-      "maxDuration": 60 // Timeout 60s for Puppeteer
-    }
-  }
+"crons": [
+{
+"path": "/api/auto-round",
+"schedule": "35 11 * * *"
+}
+],
+"functions": {
+"api/auto-round/route.ts": {
+"maxDuration": 60
+}
+}
 }
