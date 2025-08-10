@@ -1,8 +1,7 @@
 // File: miniis3\src\app\api\auto-round\route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import axios from "axios";
 import { sendNeynarMiniAppNotification } from "~/lib/neynar";
 import { getFidByAddress } from "~/lib/kv";
 
@@ -236,37 +235,21 @@ const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY || '';
 async function fetchWinningNumbers(retries = 3): Promise<number[]> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const browser = await puppeteer.launch({
-        args: chromium.args,
-        executablePath: await chromium.executablePath(),
-        headless: true,
+      const response = await axios.get('https://xoso188.net/api/front/open/lottery/history/list/5/miba', {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
       });
-      const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-      await page.goto('https://www.minhngoc.net.vn/ket-qua-xo-so/mien-bac.html', { waitUntil: 'networkidle2' });
-      await page.waitForSelector('table.bkqmienbac', { timeout: 30000 }); // Wait for table to be present
-
-      // Wait for G7 text to have content (JS populate)
-      await page.waitForFunction(() => {
-        const elem = document.querySelector('table.bkqmienbac tr:nth-child(9) td:nth-child(2)');
-        return elem && elem.textContent && elem.textContent.trim().length > 0;
-      }, { timeout: 30000 });
-
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Additional buffer if needed
-
-      const dbText = await page.evaluate(() => document.querySelector('table.bkqmienbac tr:nth-child(2) td:nth-child(2)')?.textContent?.trim() || '');
-      const g7Text = await page.evaluate(() => document.querySelector('table.bkqmienbac tr:nth-child(9) td:nth-child(2)')?.textContent?.trim() || '');
-
-      const dbNumber = dbText.slice(-2);
-      const g7Numbers = g7Text.split(/\s+|-/).filter(n => n.trim().length === 2 && /^\d{2}$/.test(n.trim()));
+      const data = response.data;
+      if (!data.t || !data.t.issueList || data.t.issueList.length === 0) throw new Error('Invalid API response');
+      const latest = data.t.issueList[0]; // Latest result
+      const dbNumber = latest.detail[0].slice(-2); // Special prize (detail[0] = DB string)
+      const g7Text = latest.detail[7]; // Seventh prize (detail[7] = "35,28,81,82")
+      const g7Numbers = g7Text.split(',').filter((n: string) => n.trim().length === 2 && /^\d{2}$/.test(n.trim()));
       const numbers = [...g7Numbers, dbNumber].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n < 100);
-
-      await browser.close();
       if (numbers.length === 5) return numbers;
       console.log(`Attempt ${attempt + 1} failed: Invalid numbers`, numbers);
       await new Promise(resolve => setTimeout(resolve, 300000)); // 5 min retry
     } catch (error) {
-      console.error('Puppeteer error:', error);
+      console.error('API error:', error);
     }
   }
   return [];
