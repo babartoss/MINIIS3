@@ -3,22 +3,28 @@
 
 import { useEffect, useState } from "react";
 import { ethers } from 'ethers';
-import { useAccount, useWriteContract } from 'wagmi'; // Add useWriteContract for claiming
+import { useAccount, useWriteContract } from 'wagmi';
 
 export function RewardTab() {
-  const { address: userAddress, isConnected } = useAccount(); // Get connected status
-  const [rewards, setRewards] = useState<{ round: number; matches: number; totalWinners: number; claimed: boolean; winningNumbers: string; }[]>([]);
-  const [loadingClaim, setLoadingClaim] = useState<number | null>(null); // To show loading when claiming
+  const { address: userAddress, isConnected } = useAccount();
+  const [rewards, setRewards] = useState<{ round: number; prizes: { prizeIndex: number; number: string; winner: string }[]; claimed: boolean; }[]>([]);
+  const [loadingClaim, setLoadingClaim] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const contractAddress = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '') as `0x${string}`;
-  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';  // Updated to mainnet
+  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 
-  const { writeContractAsync: claimRewardAsync } = useWriteContract(); // Wagmi hook for writing to contract
+  const { writeContractAsync: claimRewardAsync } = useWriteContract();
 
-  useEffect(() => {
+  const shortenAddress = (addr: string) => {
+    if (addr === "Empty Data") return addr;
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
+  const fetchRewards = async () => {
     if (!userAddress) return;
-
-    const fetchRewards = async () => {
+    setIsLoading(true);
+    try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
         'function currentRound() view returns (uint256)',
@@ -28,48 +34,40 @@ export function RewardTab() {
         'function hasClaimed(uint256, address) view returns (bool)'
       ], provider);
 
-      const currentRound = await contract.currentRound();
+      const currentRound = Number(await contract.currentRound());
       const userRewards = [];
 
-      for (let round = 1; round <= currentRound; round++) {
-        if (await contract.roundClosed(round)) {
+      for (let round = currentRound; round >= Math.max(1, currentRound - 9); round--) {
+        const isClosed = await contract.roundClosed(round);
+        if (isClosed) {
           const wNums = await contract.winningNumbers(round);
-          let matches = 0;
-          const winnersSet = new Set<string>(); // To count unique winners
-          for (let i = 0; i < 100; i++) {
-            const selector = await contract.selectedNumbers(round, i);
-            if (selector !== ethers.ZeroAddress) {
-              let playerMatches = 0;
-              for (let j = 0; j < 5; j++) {
-                if (i === wNums[j].toNumber()) {
-                  playerMatches++;
-                }
-              }
-              if (playerMatches > 0) {
-                winnersSet.add(selector); // Add unique winner
-              }
-              if (selector === userAddress) {
-                matches += playerMatches;
-              }
-            }
-          }
-          const hasClaimed = await contract.hasClaimed(round, userAddress);
-          if (matches > 0 || hasClaimed) { // Show if has matches or claimed
-            userRewards.push({
-              round,
-              matches,
-              totalWinners: winnersSet.size, // Number of unique winners
-              claimed: hasClaimed,
-              winningNumbers: wNums.map((n: ethers.BigNumberish) => Number(n).toString().padStart(2, '0')).join(', '),
+          const prizes = [];
+          for (let j = 0; j < 5; j++) {
+            const numValue = Number(wNums[j]);
+            const num = numValue.toString().padStart(2, '0');
+            const winnerAddr = await contract.selectedNumbers(round, numValue);
+            prizes.push({
+              prizeIndex: j + 1,
+              number: num,
+              winner: winnerAddr === ethers.ZeroAddress ? "Empty Data" : winnerAddr,
             });
           }
+          const hasClaimed = await contract.hasClaimed(round, userAddress);
+          userRewards.push({
+            round,
+            prizes,
+            claimed: hasClaimed,
+          });
         }
       }
-      // Sort by round descending and limit to last 10 rounds
-      userRewards.sort((a, b) => b.round - a.round);
-      setRewards(userRewards.slice(0, 10));
-    };
+      setRewards(userRewards);
+    } catch (error) {
+      console.error("Failed to fetch rewards:", error);
+    }
+    setIsLoading(false);
+  };
 
+  useEffect(() => {
     fetchRewards();
   }, [userAddress, contractAddress, rpcUrl]);
 
@@ -82,12 +80,18 @@ export function RewardTab() {
     try {
       const claimHash = await claimRewardAsync({
         address: contractAddress,
-        abi: ['function claimReward(uint256)'],
+        abi: [{
+          name: 'claimReward',
+          type: 'function',
+          inputs: [{ name: 'round', type: 'uint256' }],
+          outputs: [],
+          stateMutability: 'nonpayable',
+        }],
         functionName: 'claimReward',
-        args: [round],
+        args: [BigInt(round)],
       });
       console.log('Claim tx hash:', claimHash);
-      // Wait for confirmation if needed, but for simplicity, assume success and update state
+      // Assume success and update state; in production, wait for receipt
       setRewards(prev => prev.map(r => r.round === round ? { ...r, claimed: true } : r));
     } catch (error) {
       console.error("Claim failed:", error);
@@ -99,25 +103,56 @@ export function RewardTab() {
   return (
     <div className="mx-6">
       <h2 className="text-lg font-semibold mb-2">Your Rewards</h2>
+      <button 
+        onClick={fetchRewards} 
+        disabled={isLoading || !isConnected}
+        className="btn btn-secondary mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+      >
+        {isLoading ? 'Refreshing...' : 'Refresh Rewards'}
+      </button>
       <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
-        {rewards.map((reward, index) => (
-          <div key={index} className="mb-4 border-b pb-2">
-            <p><strong>Round {reward.round}:</strong> You matched {reward.matches} out of 5 prizes (each prize = 0.20 USDC)</p>
-            <p>Total winners in round: {reward.totalWinners} (up to 5 prizes distributed)</p>
-            <p>Round Results: {reward.winningNumbers}</p>
-            <p>Status: {reward.claimed ? 'Claimed' : 'Available'}</p>
-            {!reward.claimed && reward.matches > 0 && (
-              <button
-                onClick={() => handleClaim(reward.round)}
-                disabled={loadingClaim === reward.round}
-                className="btn btn-primary mt-2"
-              >
-                {loadingClaim === reward.round ? 'Claiming...' : 'Claim Reward'}
-              </button>
-            )}
-          </div>
-        ))}
-        {rewards.length === 0 && <p>No rewards available yet.</p>}
+        {rewards.map((reward, index) => {
+          const userMatches = reward.prizes.filter(p => p.winner.toLowerCase() === userAddress?.toLowerCase()).length;
+          return (
+            <div key={index} className="mb-6 border-b pb-4">
+              <h3 className="font-bold text-xl mb-2">Round {reward.round}</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 bg-white shadow-md rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prize</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Winner</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {reward.prizes.map((prize) => (
+                      <tr 
+                        key={prize.prizeIndex} 
+                        className={prize.winner.toLowerCase() === userAddress?.toLowerCase() ? "bg-green-100" : ""}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Prize {prize.prizeIndex}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{prize.number}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shortenAddress(prize.winner)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-sm text-gray-600">Status: {reward.claimed ? 'Claimed' : 'Available'}</p>
+              {!reward.claimed && userMatches > 0 && (
+                <button
+                  onClick={() => handleClaim(reward.round)}
+                  disabled={loadingClaim === reward.round}
+                  className="btn btn-primary mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                >
+                  {loadingClaim === reward.round ? 'Claiming...' : 'Claim Reward'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {rewards.length === 0 && <p className="text-gray-500">No rewards available yet.</p>}
       </div>
     </div>
   );
