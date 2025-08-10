@@ -5,7 +5,7 @@ const HowToPlay: React.FC<{ onTryLuck: () => void }> = ({ onTryLuck }) => {
     <div 
       className="container py-4 text-center relative"
       style={{
-        backgroundImage: `url('/htp.png')`,
+        backgroundImage: `url('/htp.jpg')`,
         backgroundSize: 'contain', // Use 'contain' to show full image without cropping
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
