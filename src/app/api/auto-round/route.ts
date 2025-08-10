@@ -239,19 +239,45 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
         headers: { 'User-Agent': 'Mozilla/5.0' }
       });
       const data = response.data;
-      if (!data.t || !data.t.issueList || data.t.issueList.length === 0) throw new Error('Invalid API response');
-      const latest = data.t.issueList[0]; // Latest result
-      const dbNumber = latest.detail[0].slice(-2); // Special prize (detail[0] = DB string)
-      const g7Text = latest.detail[7]; // Seventh prize (detail[7] = "35,28,81,82")
-      const g7Numbers = g7Text.split(',').filter((n: string) => n.trim().length === 2 && /^\d{2}$/.test(n.trim()));
+
+      // Kiểm tra response valid kỹ hơn (thêm check success để tránh response lỗi)
+      if (!data.success || !data.t || !data.t.issueList || data.t.issueList.length === 0) {
+        throw new Error('Invalid API response: success=false or missing issueList');
+      }
+
+      const latest = data.t.issueList[0];
+      // Parse detail string thành array (đây là fix chính)
+      let detailArray: string[];
+      try {
+        detailArray = JSON.parse(latest.detail);
+      } catch (parseError) {
+        throw new Error('Failed to parse detail string as JSON');
+      }
+
+      // Kiểm tra detailArray có đủ 8 phần tử (theo format xổ số miền Bắc)
+      if (!detailArray || detailArray.length < 8) {
+        throw new Error('Invalid detail array length');
+      }
+
+      const dbNumber = detailArray[0].slice(-2); // 2 chữ số cuối Giải Đặc Biệt
+      const g7Text = detailArray[7]; // Giải Bảy (dạng "46,30,02,84")
+      const g7Numbers = g7Text.split(',').map(n => n.trim()).filter(n => n.length === 2 && /^\d{2}$/.test(n));
+
+      // Kết hợp và parse thành numbers
       const numbers = [...g7Numbers, dbNumber].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n < 100);
-      if (numbers.length === 5) return numbers;
+
+      if (numbers.length === 5) {
+        console.log(`Fetched valid numbers: ${numbers}`);
+        return numbers;
+      }
+
       console.log(`Attempt ${attempt + 1} failed: Invalid numbers`, numbers);
       await new Promise(resolve => setTimeout(resolve, 300000)); // 5 min retry
-    } catch (error) {
-      console.error('API error:', error);
+    } catch (error: any) {
+      console.error('API error:', error.message || error);
     }
   }
+  console.error('All attempts failed to fetch valid numbers');
   return [];
 }
 
@@ -283,7 +309,8 @@ export async function GET(request: NextRequest) {
     if (!isClosed) {
       const winners = await fetchWinningNumbers();
       if (winners.length !== 5) {
-        throw new Error('Invalid winners data after retries');
+        console.error('Failed to fetch valid winners after retries');
+        return NextResponse.json({ success: false, message: 'Invalid winners data after retries' }, { status: 500 });
       }
       const txSet = await contract.setWinningNumbers(winners);
       await txSet.wait();
@@ -323,8 +350,8 @@ export async function GET(request: NextRequest) {
     console.log('New round started');
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Auto-round error:', error);
+  } catch (error: any) {
+    console.error('Auto-round error:', error.message || error);
     return NextResponse.json({ error: 'Failed to run auto-round' }, { status: 500 });
   }
 }

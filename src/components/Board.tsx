@@ -13,16 +13,18 @@ const Board: React.FC = () => {
   const { connect, connectors } = useConnect();
 
   const { context } = useMiniApp();
-  const fid = context?.user?.fid; // Thay nguồn FID từ context (inherit từ Farcaster client, không cần explicit sign-in)
+  const fid = context?.user?.fid; // Thay nguồn FID từ context
 
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false); // New: Modal confirm
   const [showShare, setShowShare] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [approveHash, setApproveHash] = useState<string | null>(null);
   const [selectHash, setSelectHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isBetClosed, setIsBetClosed] = useState(false); // Thời gian cứng
-  const [isRoundClosed, setIsRoundClosed] = useState(false); // Từ contract
+  const [isProcessing, setIsProcessing] = useState(false); // New: Loading state
+  const [isBetClosed, setIsBetClosed] = useState(false);
+  const [isRoundClosed, setIsRoundClosed] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<Set<number>>(new Set());
   const [currentRound, setCurrentRound] = useState<number>(0);
   const numbers = Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'));
@@ -30,8 +32,10 @@ const Board: React.FC = () => {
   const contractAddress = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '') as `0x${string}`;
   const usdcAddress = (process.env.NEXT_PUBLIC_USDC_ADDRESS || '') as `0x${string}`;
   const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
-  const betCloseStart = parseInt(process.env.NEXT_PUBLIC_BET_CLOSE_START_HOUR || '11');
-  const betCloseEnd = parseInt(process.env.NEXT_PUBLIC_BET_CLOSE_END_HOUR || '12');
+  const betCloseStartHour = 10; // 10:45 UTC start
+  const betCloseStartMinute = 45;
+  const betCloseEndHour = 11; // 11:45 UTC end
+  const betCloseEndMinute = 45;
 
   const { writeContractAsync: selectNumAsync } = useWriteContract();
   const { writeContractAsync: approveUSDCAsync } = useWriteContract();
@@ -44,7 +48,7 @@ const Board: React.FC = () => {
     hash: selectHash as `0x${string}` | undefined,
   });
 
-  // Auto-connect useEffect (trigger nếu có FID từ context)
+  // Auto-connect useEffect
   useEffect(() => {
     const isInFarcasterClient = typeof window !== 'undefined' && 
       (window.location.href.includes('warpcast.com') || 
@@ -74,18 +78,22 @@ const Board: React.FC = () => {
     }
   }, [isConnected, fid, userAddress]);
 
-  // Check thời gian đóng
+  // Check thời gian đóng (đồng bộ với backend, khóa từ 10:45 UTC đến 11:45 UTC)
   useEffect(() => {
     const checkClosingTime = () => {
       const now = new Date();
       const utcHour = now.getUTCHours();
-      setIsBetClosed(utcHour >= betCloseStart && utcHour < betCloseEnd);
+      const utcMinute = now.getUTCMinutes();
+      const isClosed = 
+        (utcHour === betCloseStartHour && utcMinute >= betCloseStartMinute) ||
+        (utcHour === betCloseEndHour && utcMinute < betCloseEndMinute);
+      setIsBetClosed(isClosed);
     };
 
     checkClosingTime();
     const interval = setInterval(checkClosingTime, 60000);
     return () => clearInterval(interval);
-  }, [betCloseStart, betCloseEnd]);
+  }, []);
 
   // Fetch selectedNumbers, roundClosed, and currentRound
   useEffect(() => {
@@ -135,11 +143,13 @@ const Board: React.FC = () => {
           console.error('Select failed:', error);
           setErrorMessage(`Select number failed: ${error.message || 'Unknown error'}`);
           setApproveHash(null);
+          setIsProcessing(false); // Reset loading
         }
       })();
     } else if (approveHash && approveReceipt.isError) {
       setErrorMessage('Approve transaction failed.');
       setApproveHash(null);
+      setIsProcessing(false);
     }
   }, [approveReceipt.isSuccess, approveReceipt.isError, approveHash, selectedNumber, userAddress, selectNumAsync, contractAddress]);
 
@@ -158,25 +168,29 @@ const Board: React.FC = () => {
       setTxHash(selectHash);
       setShowShare(true);
       setSelectHash(null);
+      setIsProcessing(false);
     } else if (selectHash && selectReceipt.isError) {
       setErrorMessage('Select transaction failed.');
       setSelectHash(null);
+      setIsProcessing(false);
     }
   }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash, selectedNumber, currentRound, fid]);
 
   const handleSelect = (num: string) => {
-    if (isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected) return;
+    if (isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected || isProcessing) return;
     setSelectedNumber(parseInt(num));
-    handleConfirm(); // Trực tiếp trigger confirm (Farcaster sẽ handle approve/confirm prompt)
+    setShowConfirm(true); // Show modal confirm instead of direct confirm
   };
 
   const handleConfirm = async () => {
+    setShowConfirm(false);
     if (isBetClosed || isRoundClosed || !selectedNumber || !userAddress || !isConnected) {
       setErrorMessage('Bet closed, round ended, or invalid state.');
       return;
     }
 
     setErrorMessage(null);
+    setIsProcessing(true); // Start loading
     console.log('Starting handleConfirm - Chain ID:', chainId, 'Connected:', isConnected);
 
     if (chainId !== base.id) {
@@ -186,6 +200,7 @@ const Board: React.FC = () => {
       } catch (error: any) {
         console.error('Switch chain failed:', error);
         setErrorMessage(`Failed to switch chain: ${error.message || 'Unknown error. Ensure wallet supports Base mainnet.'}`);
+        setIsProcessing(false);
         return;
       }
     }
@@ -203,6 +218,7 @@ const Board: React.FC = () => {
 
       if (balance < BigInt(10000)) {
         setErrorMessage('Insufficient USDC balance (need at least 0.01 USDC).');
+        setIsProcessing(false);
         return;
       }
 
@@ -248,6 +264,7 @@ const Board: React.FC = () => {
     } catch (error: any) {
       console.error('Transaction or query failed:', error);
       setErrorMessage(`Failed: ${error.message || 'Check if contract is deployed on mainnet and addresses are correct.'}`);
+      setIsProcessing(false);
     }
   };
 
@@ -264,14 +281,23 @@ const Board: React.FC = () => {
         margin: '0 auto',
       }}
     >
+      {!isConnected && (
+        <button 
+          onClick={() => connect({ connector: connectors[0] })} 
+          className="btn btn-primary mb-4"
+        >
+          Connect Wallet
+        </button>
+      )}
       {errorMessage && <div className="bg-red-500 text-white p-2 mb-4 rounded">{errorMessage}</div>}
+      {isProcessing && <div className="bg-blue-500 text-white p-2 mb-4 rounded">Processing transaction... Please wait.</div>}
       <div className="grid grid-cols-10 gap-1 sm:gap-2 auto-rows-fr max-w-[640px] mx-auto mb-4">
         {numbers.map(num => (
           <button
             key={num}
             onClick={() => handleSelect(num)}
-            className={`aspect-square flex items-center justify-center text-base font-bold rounded-lg relative shadow-md p-1 sm:p-2 ${isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-dark hover:scale-105 active:scale-95 transition-all duration-200'} bg-primary text-white`}
-            disabled={isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected}
+            className={`aspect-square flex items-center justify-center text-base font-bold rounded-lg relative shadow-md p-1 sm:p-2 ${isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected || isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-dark hover:scale-105 active:scale-95 transition-all duration-200'} bg-primary text-white`}
+            disabled={isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected || isProcessing}
           >
             {num}
             {selectedNumbers.has(parseInt(num)) && <span className="absolute top-0 right-0 text-green-500 text-xs sm:text-sm">✅</span>}
@@ -286,6 +312,21 @@ const Board: React.FC = () => {
           Check Results Online
         </a>
       </div>
+
+      {/* New: Confirm Modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-4 rounded-lg shadow-lg">
+            <h2 className="text-lg font-bold mb-2">Confirm Selection</h2>
+            <p>Select number {selectedNumber?.toString().padStart(2, '0')} for 0.01 USDC?</p>
+            <div className="flex justify-end mt-4">
+              <button onClick={() => setShowConfirm(false)} className="btn btn-secondary mr-2">Cancel</button>
+              <button onClick={handleConfirm} className="btn btn-primary">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showShare && <ShareModal onClose={() => setShowShare(false)} selectedNumber={selectedNumber!} txHash={txHash!} />}
     </div>
   );
