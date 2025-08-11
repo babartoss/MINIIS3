@@ -54,7 +54,7 @@ const HowToPlay: React.FC<{ onTryLuck: () => void }> = ({ onTryLuck }) => {
           • Note: Future reward values may vary depending on community support—more engagement with MINIIS3 could mean bigger rewards.
         </p>
         
-        <button onClick={onTryLuck} className="btn btn-primary w-full max-w-xs mt-4 rounded-full shadow-md transition-all duration-300">
+        <button onClick={onTryLuck} className="btn btn-primary px-6 py-3 mt-4 rounded-full shadow-md transition-all duration-300">
           TRY YOUR LUCK
         </button>
       </div>

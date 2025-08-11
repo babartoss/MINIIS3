@@ -71,8 +71,8 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
         <h2 className="text-lg font-bold mb-2 text-white drop-shadow-md">Your Ticket</h2>
         <img src={imageUrl} alt="Ticket" className="w-full max-w-[300px] h-auto mb-4 rounded-md" />
         <div className="flex justify-between gap-2">
-          <ShareButton buttonText="Share on Farcaster" cast={castConfig} className="btn btn-primary w-1/2 text-white text-center" />
-          <button onClick={onClose} className="btn btn-secondary w-1/2 text-white text-center">Close</button>
+          <ShareButton buttonText="Share on Farcaster" cast={castConfig} className="btn btn-primary px-4 py-2 text-white text-center rounded-full" />
+          <button onClick={onClose} className="btn bg-gray-700 hover:bg-gray-800 px-4 py-2 text-white text-center rounded-full">Close</button>
         </div>
       </div>
     </div>

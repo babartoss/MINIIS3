@@ -65,11 +65,11 @@ function ConnectionControls({
   return (
     <div className="flex justify-center">
       {isConnected ? (
-        <Button onClick={() => disconnect()} className="w-full max-w-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-md transition-all duration-300">
+        <Button onClick={() => disconnect()} className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-md transition-all duration-300">
           Disconnect Wallet
         </Button>
       ) : context ? (
-        <Button onClick={() => connect({ connector: connectors[0] })} className="w-full max-w-xs bg-primary hover:bg-primary-light text-white font-semibold rounded-full shadow-md transition-all duration-300">
+        <Button onClick={() => connect({ connector: connectors[0] })} className="px-6 py-3 bg-primary hover:bg-primary-light text-white font-semibold rounded-full shadow-md transition-all duration-300">
           Connect Farcaster Wallet
         </Button>
       ) : null}
@@ -118,15 +118,15 @@ export function WalletTab() {
 
   return (
     <div 
-      className="flex flex-col items-center justify-center p-4 bg-contain bg-center bg-no-repeat relative overflow-hidden h-auto max-h-[80vh] w-full max-w-md mx-auto rounded-xl shadow-xl"
+      className="flex flex-col items-center justify-center p-4 bg-contain bg-center bg-no-repeat relative overflow-hidden h-auto max-h-[80vh] w-full max-w-sm mx-auto rounded-xl shadow-xl aspect-square"  // Changed to max-w-sm (384px) for consistency, added aspect-square to make width=height=384px
       style={{ 
-        backgroundImage: "url('/wllt.png')",  // Using .png for better integration, now with bg-contain to fit resized 384x384 image without cropping or distortion
+        backgroundImage: "url('/wllt.png')",  // Assumes resized 384x384 image fits perfectly in square container
       }}
     >
       {/* Overlay for improved readability, adjusted for mobile */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-xl"></div>
       
-      <div className="w-full max-w-sm bg-transparent relative z-10 space-y-6 text-center"> {/* Kept max-w-sm for mobile fit, ensuring consistency */}
+      <div className="w-full max-w-sm bg-transparent relative z-10 space-y-6 text-center"> {/* Consistent max-w-sm */}
         <h2 className="text-2xl font-bold text-white drop-shadow-md">Wallet Management</h2> {/* Reduced text size for compactness */}
         
         <WalletStatus address={address} chainId={chainId} />
@@ -140,12 +140,12 @@ export function WalletTab() {
         />
         
         {isConnected && (
-          <div className="space-y-4">
+          <div className="space-y-4 flex justify-center">
             <Button
               onClick={handleSwitchChain}
               disabled={isChainSwitchPending}
               isLoading={isChainSwitchPending}
-              className="w-full bg-primary hover:bg-primary-light text-white font-semibold rounded-full shadow-md transition-all duration-300"
+              className="px-6 py-3 bg-primary hover:bg-primary-light text-white font-semibold rounded-full shadow-md transition-all duration-300"
             >
               Switch to {base.name}
             </Button>
