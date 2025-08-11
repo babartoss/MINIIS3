@@ -118,15 +118,15 @@ export function WalletTab() {
 
   return (
     <div 
-      className="min-h-screen flex flex-col items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative overflow-hidden"
+      className="flex flex-col items-center justify-center p-4 bg-contain bg-center bg-no-repeat relative overflow-hidden h-auto max-h-[80vh] w-full max-w-md mx-auto rounded-xl shadow-xl"
       style={{ 
-        backgroundImage: "url('/wllt.png')",  // Using .png for better integration
+        backgroundImage: "url('/wllt.png')",  // Using .png for better integration, now with bg-contain to fit resized 384x384 image without cropping or distortion
       }}
     >
       {/* Overlay for improved readability, adjusted for mobile */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-xl"></div>
       
-      <div className="w-full max-w-sm bg-transparent relative z-10 space-y-6 text-center"> {/* Changed to max-w-sm (24rem) for better mobile fit */}
+      <div className="w-full max-w-sm bg-transparent relative z-10 space-y-6 text-center"> {/* Kept max-w-sm for mobile fit, ensuring consistency */}
         <h2 className="text-2xl font-bold text-white drop-shadow-md">Wallet Management</h2> {/* Reduced text size for compactness */}
         
         <WalletStatus address={address} chainId={chainId} />
