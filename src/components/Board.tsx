@@ -32,10 +32,6 @@ const Board: React.FC = () => {
   const contractAddress = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '') as `0x${string}`;
   const usdcAddress = (process.env.NEXT_PUBLIC_USDC_ADDRESS || '') as `0x${string}`;
   const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
-  const betCloseStartHour = 10; // 10:45 UTC start
-  const betCloseStartMinute = 45;
-  const betCloseEndHour = 11; // 11:45 UTC end
-  const betCloseEndMinute = 45;
 
   const { writeContractAsync: selectNumAsync } = useWriteContract();
   const { writeContractAsync: approveUSDCAsync } = useWriteContract();
@@ -78,15 +74,15 @@ const Board: React.FC = () => {
     }
   }, [isConnected, fid, userAddress]);
 
-  // Check thời gian đóng (đồng bộ với backend, khóa từ 10:45 UTC đến 11:45 UTC)
+  // Check thời gian đóng (đồng bộ với backend, khóa từ 11:00 UTC đến 12:30 UTC)
   useEffect(() => {
     const checkClosingTime = () => {
       const now = new Date();
       const utcHour = now.getUTCHours();
       const utcMinute = now.getUTCMinutes();
       const isClosed = 
-        (utcHour === betCloseStartHour && utcMinute >= betCloseStartMinute) ||
-        (utcHour === betCloseEndHour && utcMinute < betCloseEndMinute);
+        (utcHour === 11 && utcMinute >= 0) ||  // Bắt đầu đóng lúc 11:00
+        (utcHour === 12 && utcMinute < 30);   // Kết thúc lúc 12:30
       setIsBetClosed(isClosed);
     };
 

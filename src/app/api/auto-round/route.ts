@@ -290,11 +290,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check time: Only run if after 11:30 UTC
+  // Check time: Only run if after 12:00 UTC
   const now = new Date();
   const utcHour = now.getUTCHours();
   const utcMinute = now.getUTCMinutes();
-  if (utcHour < 11 || (utcHour === 11 && utcMinute < 30)) {
+  if (utcHour < 12 || (utcHour === 12 && utcMinute < 0)) {
     return NextResponse.json({ success: false, message: 'Too early for results' }, { status: 200 });
   }
 

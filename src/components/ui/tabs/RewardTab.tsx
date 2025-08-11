@@ -24,6 +24,7 @@ export function RewardTab() {
   };
 
   const fetchRewards = async () => {
+    if (!userAddress) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -31,7 +32,7 @@ export function RewardTab() {
       const contract = new ethers.Contract(contractAddress, [
         'function currentRound() view returns (uint256)',
         'function roundClosed(uint256) view returns (bool)',
-        'function winningNumbers(uint256) view returns (uint8[5])',
+        'function winningNumbers(uint256, uint256) view returns (uint8)',
         'function selectedNumbers(uint256, uint8) view returns (address)',
         'function hasClaimed(uint256, address) view returns (bool)',
         'function rewardPerMatch() view returns (uint256)'
@@ -46,7 +47,12 @@ export function RewardTab() {
       for (let round = currentRound; round >= Math.max(1, currentRound - 9); round--) {
         const isClosed = await contract.roundClosed(round);
         if (isClosed) {
-          const wNums = await contract.winningNumbers(round);
+          // Fix: Loop to fetch each winningNumbers(round, i) vì ABI là per index
+          const wNums = [];
+          for (let i = 0; i < 5; i++) {
+            wNums.push(await contract.winningNumbers(round, i));
+          }
+
           const prizes = [];
           for (let j = 0; j < 5; j++) {
             const numValue = Number(wNums[j]);
@@ -58,7 +64,7 @@ export function RewardTab() {
               winner: winnerAddr === ethers.ZeroAddress ? "No Winner" : winnerAddr,
             });
           }
-          const hasClaimed = userAddress ? await contract.hasClaimed(round, userAddress) : false;
+          const hasClaimed = await contract.hasClaimed(round, userAddress);
           userRewards.push({
             round,
             prizes,
@@ -67,11 +73,12 @@ export function RewardTab() {
         }
       }
       setRewards(userRewards);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch rewards:", error);
-      setError('Failed to load rewards. Please check your connection or contract status.');
+      setError(`Failed to load rewards: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -79,45 +86,43 @@ export function RewardTab() {
   }, [userAddress, contractAddress, rpcUrl]);
 
   const handleClaim = async (round: number) => {
-    if (!isConnected || !userAddress) {
-      console.error("Wallet not connected");
-      return;
-    }
+    if (loadingClaim !== null) return;
     setLoadingClaim(round);
     try {
-      const claimHash = await claimRewardAsync({
+      await claimRewardAsync({
         address: contractAddress,
-        abi: [{
-          name: 'claimReward',
-          type: 'function',
-          inputs: [{ name: 'round', type: 'uint256' }],
-          outputs: [],
-          stateMutability: 'nonpayable',
-        }],
+        abi: [
+          {
+            name: 'claimReward',
+            type: 'function',
+            inputs: [{ name: 'round', type: 'uint256' }],
+            outputs: [],
+            stateMutability: 'nonpayable',
+          },
+        ],
         functionName: 'claimReward',
-        args: [BigInt(round)],
+        args: [BigInt(round)],  // Fix: Convert number to bigint for uint256
       });
-      console.log('Claim tx hash:', claimHash);
-      // Assume success and update state; in production, wait for receipt
-      setRewards(prev => prev.map(r => r.round === round ? { ...r, claimed: true } : r));
-    } catch (error) {
-      console.error("Claim failed:", error);
-      alert("Claim failed. Please try again.");
+      // Refresh sau claim thành công
+      fetchRewards();
+    } catch (error: any) {
+      console.error('Claim failed:', error);
+      setError(`Claim failed: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoadingClaim(null);
     }
-    setLoadingClaim(null);
   };
 
   return (
-    <div className="mx-6">
-      <h2 className="text-lg font-semibold mb-2">Rewards</h2>
-      <button 
-        onClick={fetchRewards} 
-        disabled={isLoading}
-        className="btn btn-secondary mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+    <div className="flex flex-col items-center">
+      <button
+        onClick={fetchRewards}
+        disabled={isLoading || !isConnected}
+        className="btn btn-primary mb-4 px-4 py-2 disabled:opacity-50"
       >
         {isLoading ? 'Refreshing...' : 'Refresh Rewards'}
       </button>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
+      {error && <div className="bg-red-500 text-white p-2 mb-4 rounded">{error}</div>}
       <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
         {rewards.map((reward, index) => {
           const userMatches = reward.prizes.filter(p => p.winner.toLowerCase() === userAddress?.toLowerCase()).length;
@@ -152,7 +157,7 @@ export function RewardTab() {
                 </table>
               </div>
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 text-center">Status: {reward.claimed ? 'Claimed' : 'Available'}</p>
-              {isConnected && !reward.claimed && userMatches > 0 && (
+              {!reward.claimed && userMatches > 0 && (
                 <div className="flex justify-center mt-3">
                   <button
                     onClick={() => handleClaim(reward.round)}
