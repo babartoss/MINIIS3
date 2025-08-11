@@ -5,10 +5,6 @@ import { useEffect, useState } from "react";
 import { ethers } from 'ethers';
 import { useAccount, useWriteContract } from 'wagmi';
 
-function truncateAddress(addr: string) {
-  return addr.slice(0, 6) + '...' + addr.slice(-4);
-}
-
 export function RewardTab() {
   const { address: userAddress, isConnected } = useAccount();
   const [rewards, setRewards] = useState<{ round: number; prizes: { prizeIndex: number; number: string; winner: string }[]; claimed: boolean; }[]>([]);
@@ -22,8 +18,12 @@ export function RewardTab() {
 
   const { writeContractAsync: claimRewardAsync } = useWriteContract();
 
+  const shortenAddress = (addr: string) => {
+    if (addr === "No Winner") return addr;
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
   const fetchRewards = async () => {
-    if (!userAddress) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -37,7 +37,6 @@ export function RewardTab() {
         'function rewardPerMatch() view returns (uint256)'
       ], provider);
 
-      // Fetch rewardPerMatch một lần
       const rewardPerMatch = await contract.rewardPerMatch();
       setRewardPerUSDC(Number(rewardPerMatch) / 1e6);
 
@@ -49,53 +48,17 @@ export function RewardTab() {
         if (isClosed) {
           const wNums = await contract.winningNumbers(round);
           const prizes = [];
-          const uniqueAddresses = new Set<string>();
           for (let j = 0; j < 5; j++) {
             const numValue = Number(wNums[j]);
             const num = numValue.toString().padStart(2, '0');
             const winnerAddr = await contract.selectedNumbers(round, numValue);
-            const winner = winnerAddr === ethers.ZeroAddress ? "No Winner" : winnerAddr;
-            if (winner !== "No Winner") uniqueAddresses.add(winner.toLowerCase());
             prizes.push({
               prizeIndex: j + 1,
               number: num,
-              winner,
+              winner: winnerAddr === ethers.ZeroAddress ? "No Winner" : winnerAddr,
             });
           }
-
-          // Fetch FID and usernames for winners
-          const addressesArray = Array.from(uniqueAddresses);
-          const fidsResponse = await fetch('/api/get-fids', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ addresses: addressesArray }),
-          });
-          const fidsMap = fidsResponse.ok ? await fidsResponse.json() : {};
-
-          const fids = Object.values(fidsMap).filter(fid => fid);
-          let usersMap: { [fid: number]: { username: string; display_name: string } } = {};
-          if (fids.length > 0) {
-            const usersResponse = await fetch('/api/get-users', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fids }),
-            });
-            usersMap = usersResponse.ok ? await usersResponse.json() : {};
-          }
-
-          prizes.forEach(prize => {
-            if (prize.winner !== "No Winner") {
-              const fid = fidsMap[prize.winner.toLowerCase()];
-              if (fid) {
-                const userInfo = usersMap[fid];
-                prize.winner = userInfo?.username ? `@${userInfo.username}` : truncateAddress(prize.winner);
-              } else {
-                prize.winner = truncateAddress(prize.winner);
-              }
-            }
-          });
-
-          const hasClaimed = await contract.hasClaimed(round, userAddress);
+          const hasClaimed = userAddress ? await contract.hasClaimed(round, userAddress) : false;
           userRewards.push({
             round,
             prizes,
@@ -113,8 +76,6 @@ export function RewardTab() {
 
   useEffect(() => {
     fetchRewards();
-    const interval = setInterval(fetchRewards, 30000); // Auto-refresh every 30s
-    return () => clearInterval(interval);
   }, [userAddress, contractAddress, rpcUrl]);
 
   const handleClaim = async (round: number) => {
@@ -137,7 +98,7 @@ export function RewardTab() {
         args: [BigInt(round)],
       });
       console.log('Claim tx hash:', claimHash);
-      // Assume success and update state
+      // Assume success and update state; in production, wait for receipt
       setRewards(prev => prev.map(r => r.round === round ? { ...r, claimed: true } : r));
     } catch (error) {
       console.error("Claim failed:", error);
@@ -148,10 +109,10 @@ export function RewardTab() {
 
   return (
     <div className="mx-6">
-      <h2 className="text-lg font-semibold mb-2">Your Rewards</h2>
+      <h2 className="text-lg font-semibold mb-2">Rewards</h2>
       <button 
         onClick={fetchRewards} 
-        disabled={isLoading || !isConnected}
+        disabled={isLoading}
         className="btn btn-secondary mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
       >
         {isLoading ? 'Refreshing...' : 'Refresh Rewards'}
@@ -181,7 +142,7 @@ export function RewardTab() {
                       >
                         <td className="px-4 py-2 border-b text-sm font-medium">Prize {prize.prizeIndex}</td>
                         <td className="px-4 py-2 border-b text-sm text-red-500 font-bold">{prize.number}</td>
-                        <td className="px-4 py-2 border-b text-sm">{prize.winner === "No Winner" ? prize.winner : prize.winner}</td>
+                        <td className="px-4 py-2 border-b text-sm">{shortenAddress(prize.winner)}</td>
                         <td className="px-4 py-2 border-b text-sm">
                           {prize.winner !== "No Winner" ? `${rewardPerUSDC.toFixed(2)} USDC` : "-"}
                         </td>
@@ -191,7 +152,7 @@ export function RewardTab() {
                 </table>
               </div>
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 text-center">Status: {reward.claimed ? 'Claimed' : 'Available'}</p>
-              {!reward.claimed && userMatches > 0 && (
+              {isConnected && !reward.claimed && userMatches > 0 && (
                 <div className="flex justify-center mt-3">
                   <button
                     onClick={() => handleClaim(reward.round)}
@@ -205,7 +166,7 @@ export function RewardTab() {
             </div>
           );
         })}
-        {rewards.length === 0 && !error && <p className="text-center text-gray-500">No rewards available yet. Check back after rounds close.</p>}
+        {rewards.length === 0 && <p className="text-center text-gray-500">No rewards available yet.</p>}
       </div>
     </div>
   );

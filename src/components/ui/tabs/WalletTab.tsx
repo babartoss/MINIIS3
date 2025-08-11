@@ -118,18 +118,20 @@ export function WalletTab() {
 
   return (
     <div 
-      className="min-h-screen flex flex-col items-center justify-center p-6 bg-cover bg-center bg-no-repeat relative overflow-hidden"
+      className="flex flex-col items-center justify-center p-8 bg-contain bg-center bg-no-repeat relative overflow-hidden"
       style={{ 
         backgroundImage: "url('/wllt.png')",  // Switched to .png for potential transparency/integration benefits
-        maxWidth: '762px',  // Match the 762x762 dimension for consistency (responsive max)
+        width: '762px',  // Set fixed width to match image
+        height: '762px',  // Set fixed height to match image, making it square and compact
+        maxWidth: '762px',  // Ensure responsive scaling down
         maxHeight: '762px',
-        margin: '0 auto',  // Center it horizontally
+        margin: '0 auto',  // Center horizontally
         borderRadius: '16px',  // Soft rounded corners for professional look
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',  // Subtle shadow for depth
       }}
     >
       {/* Overlay for better readability on background image */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
       
       <div className="w-full max-w-md bg-transparent relative z-10 space-y-6 text-center">
         <h2 className="text-3xl font-bold text-white drop-shadow-md">Wallet Management</h2>
