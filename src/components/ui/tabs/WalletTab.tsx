@@ -26,7 +26,7 @@ interface WalletStatusProps {
 
 function WalletStatus({ address, chainId }: WalletStatusProps) {
   return (
-    <div className="bg-white/10 backdrop-blur-md dark:bg-gray-800/50 p-4 rounded-lg shadow-lg border border-white/20">
+    <div className="bg-white/10 backdrop-blur-md dark:bg-secondary-dark/50 p-4 rounded-lg shadow-lg border border-white/20">
       {address && (
         <div className="text-sm mb-2 text-white">
           <span className="font-semibold">Address:</span> {truncateAddress(address)}
@@ -69,7 +69,7 @@ function ConnectionControls({
           Disconnect Wallet
         </Button>
       ) : context ? (
-        <Button onClick={() => connect({ connector: connectors[0] })} className="w-full max-w-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-full shadow-md transition-all duration-300">
+        <Button onClick={() => connect({ connector: connectors[0] })} className="w-full max-w-xs bg-primary hover:bg-primary-light text-white font-semibold rounded-full shadow-md transition-all duration-300">
           Connect Farcaster Wallet
         </Button>
       ) : null}
@@ -118,23 +118,16 @@ export function WalletTab() {
 
   return (
     <div 
-      className="flex flex-col items-center justify-center p-8 bg-contain bg-center bg-no-repeat relative overflow-hidden"
+      className="min-h-screen flex flex-col items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative overflow-hidden"
       style={{ 
-        backgroundImage: "url('/wllt.png')",  // Switched to .png for potential transparency/integration benefits
-        width: '762px',  // Set fixed width to match image
-        height: '762px',  // Set fixed height to match image, making it square and compact
-        maxWidth: '762px',  // Ensure responsive scaling down
-        maxHeight: '762px',
-        margin: '0 auto',  // Center horizontally
-        borderRadius: '16px',  // Soft rounded corners for professional look
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',  // Subtle shadow for depth
+        backgroundImage: "url('/wllt.png')",  // Using .png for better integration
       }}
     >
-      {/* Overlay for better readability on background image */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
+      {/* Overlay for improved readability, adjusted for mobile */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
       
-      <div className="w-full max-w-md bg-transparent relative z-10 space-y-6 text-center">
-        <h2 className="text-3xl font-bold text-white drop-shadow-md">Wallet Management</h2>
+      <div className="w-full max-w-sm bg-transparent relative z-10 space-y-6 text-center"> {/* Changed to max-w-sm (24rem) for better mobile fit */}
+        <h2 className="text-2xl font-bold text-white drop-shadow-md">Wallet Management</h2> {/* Reduced text size for compactness */}
         
         <WalletStatus address={address} chainId={chainId} />
         
@@ -152,7 +145,7 @@ export function WalletTab() {
               onClick={handleSwitchChain}
               disabled={isChainSwitchPending}
               isLoading={isChainSwitchPending}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold rounded-full shadow-md transition-all duration-300"
+              className="w-full bg-primary hover:bg-primary-light text-white font-semibold rounded-full shadow-md transition-all duration-300"
             >
               Switch to {base.name}
             </Button>
