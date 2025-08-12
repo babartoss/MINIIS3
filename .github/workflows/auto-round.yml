@@ -1,0 +1,12 @@
+name: Auto Round Cron
+on:
+  schedule:
+    - cron: '0 12 * * *'  # 12:00 UTC daily
+  workflow_dispatch:  # Cho manual test
+
+jobs:
+  trigger-auto-round:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call API Endpoint
+        run: curl -X GET "https://miniis-3.vercel.app/api/auto-round" -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" -f || echo "Fail - check logs"

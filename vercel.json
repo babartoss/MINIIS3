@@ -1,10 +1,5 @@
 {
-  "crons": [
-    {
-      "path": "/api/auto-round",
-      "schedule": "0 12 * * *"
-    }
-  ],
+  "crons": [],  // Xóa hết để disable cron
   "functions": {
     "app/api/auto-round/route.ts": {
       "maxDuration": 60
