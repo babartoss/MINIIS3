@@ -59,7 +59,7 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
   }, [selectedNumber, round, player, txHash]);
 
   const castConfig = {
-    text: `I just picked number ${selectedNumber.toString().padStart(2, '0')} in MINIIS3 Round ${round}!`,
+    text: `I just picked number ${selectedNumber.toString().padStart(2, '0')} in MINIIS3 Round ${round}! - @babartos`,
     embeds: [
       shareUrl
     ],

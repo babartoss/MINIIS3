@@ -240,13 +240,11 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
       });
       const data = response.data;
 
-      // Kiểm tra response valid kỹ hơn (thêm check success để tránh response lỗi)
       if (!data.success || !data.t || !data.t.issueList || data.t.issueList.length === 0) {
         throw new Error('Invalid API response: success=false or missing issueList');
       }
 
       const latest = data.t.issueList[0];
-      // Parse detail string thành array (đây là fix chính)
       let detailArray: string[];
       try {
         detailArray = JSON.parse(latest.detail);
@@ -254,16 +252,14 @@ async function fetchWinningNumbers(retries = 3): Promise<number[]> {
         throw new Error('Failed to parse detail string as JSON');
       }
 
-      // Kiểm tra detailArray có đủ 8 phần tử (theo format xổ số miền Bắc)
       if (!detailArray || detailArray.length < 8) {
         throw new Error('Invalid detail array length');
       }
 
-      const dbNumber = detailArray[0].slice(-2); // 2 chữ số cuối Giải Đặc Biệt
-      const g7Text = detailArray[7]; // Giải Bảy (dạng "46,30,02,84")
+      const dbNumber = detailArray[0].slice(-2);
+      const g7Text = detailArray[7];
       const g7Numbers = g7Text.split(',').map(n => n.trim()).filter(n => n.length === 2 && /^\d{2}$/.test(n));
 
-      // Kết hợp và parse thành numbers
       const numbers = [...g7Numbers, dbNumber].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n < 100);
 
       if (numbers.length === 5) {
@@ -312,6 +308,26 @@ export async function GET(request: NextRequest) {
         console.error('Failed to fetch valid winners after retries');
         return NextResponse.json({ success: false, message: 'Invalid winners data after retries' }, { status: 500 });
       }
+      // Đề xuất an toàn: Check if winners all zero (invalid)
+      const isAllZero = winners.every(n => n === 0);
+      if (isAllZero) {
+        console.error('Winners all zero - invalid, skipping set');
+        return NextResponse.json({ success: false, message: 'Invalid all-zero winners' }, { status: 200 });
+      }
+
+      // Thêm check ngăn set winners lặp (so sánh với round trước)
+      if (currentRound > 1) {
+        const prevWinners: number[] = [];  // Fix: Explicit type number[] để tránh error implicit any[]
+        for (let i = 0; i < 5; i++) {
+          prevWinners.push(Number(await contract.winningNumbers(currentRound - 1, i)));
+        }
+        const isSameAsPrev = winners.every((num, idx) => num === prevWinners[idx]);
+        if (isSameAsPrev) {
+          console.log(`Winners for round ${currentRound} same as round ${currentRound - 1}, skipping set`);
+          return NextResponse.json({ success: false, message: 'Winners identical to previous round' }, { status: 200 });
+        }
+      }
+
       const txSet = await contract.setWinningNumbers(winners);
       await txSet.wait();
       console.log(`Round ${currentRound} closed with winners: ${winners}`);
@@ -326,6 +342,8 @@ export async function GET(request: NextRequest) {
           winnersMap.set(addr, currentMatches + 1);
         }
       }
+      // Đề xuất: Log winnersMap size để debug
+      console.log(`Winners map size for round ${currentRound}: ${winnersMap.size}`);
 
       const rewardPerMatch = Number(await contract.rewardPerMatch());
       for (const [addr, matches] of winnersMap.entries()) {
