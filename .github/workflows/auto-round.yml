@@ -1,3 +1,4 @@
+# Test activation
 name: Auto Round Cron
 on:
   schedule:
