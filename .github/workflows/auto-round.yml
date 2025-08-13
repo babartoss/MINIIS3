@@ -1,7 +1,7 @@
 name: Auto Round Cron
 on:
   schedule:
-    - cron: '0 12 * * *'  # 12:00 UTC daily
+    - cron: '30 12 * * *'  # 12:30 UTC daily
   workflow_dispatch:  # For manual test
 
 jobs:

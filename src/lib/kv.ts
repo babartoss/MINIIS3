@@ -23,3 +23,14 @@ export async function getFidByAddress(address: string): Promise<number | null> {
   const fid = await redis.get(`${PREFIX}address_fid:${address.toLowerCase()}`);
   return fid ? Number(fid) : null;
 }
+
+// New: Add FID to users set for broadcast
+export async function addUserFid(fid: number) {
+  await redis.sadd(`${PREFIX}users`, fid);
+}
+
+// New: Get all user FIDs for broadcast
+export async function getAllUserFids(): Promise<number[]> {
+  const members = await redis.smembers(`${PREFIX}users`);
+  return members.map(Number);
+}

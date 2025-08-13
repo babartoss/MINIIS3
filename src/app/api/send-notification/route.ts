@@ -1,7 +1,7 @@
 import { notificationDetailsSchema } from "@farcaster/miniapp-sdk";
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { setUserNotificationDetails } from "~/lib/kv";
+import { setUserNotificationDetails, addUserFid } from "~/lib/kv"; // Updated: import addUserFid
 import { sendMiniAppNotification } from "~/lib/notifs";
 import { sendNeynarMiniAppNotification } from "~/lib/neynar";
 
@@ -24,6 +24,9 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Always add FID to users set for broadcast, regardless of Neynar
+  await addUserFid(Number(requestBody.data.fid));
 
   // Only store notification details if not using Neynar
   if (!neynarEnabled) {

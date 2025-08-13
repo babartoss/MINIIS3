@@ -38,18 +38,19 @@ type SendMiniAppNotificationResult =
   | { state: "rate_limit" }
   | { state: "success" };
 
+// Updated: Support broadcast with fids: [] for all users who added the mini-app
 export async function sendNeynarMiniAppNotification({
-  fid,
+  fids = [],  // Empty array for broadcast to all eligible users
   title,
   body,
 }: {
-  fid: number;
+  fids?: number[];  // Optional, empty for broadcast
   title: string;
   body: string;
 }): Promise<SendMiniAppNotificationResult> {
   try {
     const client = getNeynarClient();
-    const targetFids = [fid];
+    const targetFids = fids;
     const notification = {
       title,
       body,

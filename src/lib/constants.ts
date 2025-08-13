@@ -8,13 +8,13 @@ export const APP_URL: string = process.env.NEXT_PUBLIC_URL!;
 export const APP_NAME = 'MINIIS3';
 
 // Mô tả app (đã chỉnh cho lottery)
-export const APP_DESCRIPTION = 'Mini lottery app on Farcaster, pick lucky numbers and win USDC';
+export const APP_DESCRIPTION = 'Game, Mini lottery app on Farcaster, pick lucky numbers and win USDC';
 
 // Phân loại chính
 export const APP_PRIMARY_CATEGORY = 'games';
 
 // Tags (đã chỉnh liên quan lottery)
-export const APP_TAGS = ['lottery', 'betting', 'lucky', 'draw', 'numbers', 'vietnam', 'crypto', 'farcaster', 'web3'];
+export const APP_TAGS = ['lottery', 'betting', 'lucky', 'draw', 'numbers', 'vietnam', 'crypto', 'farcaster', 'game', 'web3'];
 
 // URL icon (thay nếu có icon custom)
 export const APP_ICON_URL: string = `${APP_URL}/icon.png`;

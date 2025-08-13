@@ -3,32 +3,167 @@ import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import axios from "axios";
 import { sendNeynarMiniAppNotification } from "~/lib/neynar";
-import { getFidByAddress } from "~/lib/kv";
+import { getFidByAddress, getAllUserFids } from "~/lib/kv";
+import { sendMiniAppNotification } from "~/lib/notifs";
 
 // ABI đầy đủ từ contract
 const ABI = [
   {
-    "inputs": [{"internalType": "address", "name": "_usdc", "type": "address"}],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_usdc",
+        "type": "address"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "constructor"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
     "anonymous": false,
-    "inputs": [{"indexed": false, "internalType": "uint256", "name": "newAmount", "type": "uint256"}],
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newAmount",
+        "type": "uint256"
+      }
+    ],
     "name": "BetAmountUpdated",
     "type": "event"
   },
   {
     "anonymous": false,
-    "inputs": [{"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}],
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
     "name": "Deposited",
     "type": "event"
   },
   {
     "anonymous": false,
     "inputs": [
-      {"indexed": false, "internalType": "uint256", "name": "round", "type": "uint256"},
-      {"indexed": false, "internalType": "uint8[5]", "name": "winners", "type": "uint8[5]"}
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "round",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "selector",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "number",
+        "type": "uint8"
+      }
+    ],
+    "name": "NumberSelected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "round",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "claimant",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "RewardClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newReward",
+        "type": "uint256"
+      }
+    ],
+    "name": "RewardPerMatchUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "round",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8[5]",
+        "name": "winners",
+        "type": "uint8[5]"
+      }
     ],
     "name": "RoundEnded",
     "type": "event"
@@ -36,65 +171,87 @@ const ABI = [
   {
     "anonymous": false,
     "inputs": [
-      {"indexed": false, "internalType": "uint256", "name": "round", "type": "uint256"},
-      {"indexed": false, "internalType": "address", "name": "claimant", "type": "address"},
-      {"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    "name": "RewardClaimed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [{"indexed": false, "internalType": "uint256", "name": "newReward", "type": "uint256"}],
-    "name": "RewardPerMatchUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": false, "internalType": "uint256", "name": "round", "type": "uint256"},
-      {"indexed": false, "internalType": "address", "name": "selector", "type": "address"},
-      {"indexed": false, "internalType": "uint8", "name": "number", "type": "uint8"}
-    ],
-    "name": "NumberSelected",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [{"indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256"}],
     "name": "Withdrawn",
     "type": "event"
   },
   {
     "inputs": [],
     "name": "betAmount",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "round", "type": "uint256"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "round",
+        "type": "uint256"
+      }
+    ],
     "name": "claimReward",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}, {"internalType": "address", "name": "", "type": "address"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
     "name": "claimed",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
     "name": "currentRound",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "amount", "type": "uint256"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
     "name": "depositReward",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -103,28 +260,63 @@ const ABI = [
   {
     "inputs": [],
     "name": "getPoolBalance",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "round", "type": "uint256"}, {"internalType": "address", "name": "user", "type": "address"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "round",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
     "name": "hasClaimed",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
     "name": "owner",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
     "name": "poolBalance",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
@@ -138,54 +330,125 @@ const ABI = [
   {
     "inputs": [],
     "name": "rewardPerMatch",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "name": "roundClosed",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint8", "name": "number", "type": "uint8"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "selectedCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "name": "selectedNumbers",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "number",
+        "type": "uint8"
+      }
+    ],
     "name": "selectNumber",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "name": "selectedCount",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}, {"internalType": "uint8", "name": "", "type": "uint8"}],
-    "name": "selectedNumbers",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "newAmount", "type": "uint256"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newAmount",
+        "type": "uint256"
+      }
+    ],
     "name": "setBetAmount",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "newReward", "type": "uint256"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newReward",
+        "type": "uint256"
+      }
+    ],
     "name": "setRewardPerMatch",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint8[5]", "name": "_winners", "type": "uint8[5]"}],
+    "inputs": [
+      {
+        "internalType": "uint8[5]",
+        "name": "_winners",
+        "type": "uint8[5]"
+      }
+    ],
     "name": "setWinningNumbers",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -199,7 +462,13 @@ const ABI = [
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "address", "name": "newOwner", "type": "address"}],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
     "name": "transferOwnership",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -208,89 +477,96 @@ const ABI = [
   {
     "inputs": [],
     "name": "usdc",
-    "outputs": [{"internalType": "contract IERC20", "name": "", "type": "address"}],
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "amount", "type": "uint256"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
     "name": "withdrawReward",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}, {"internalType": "uint256", "name": "", "type": "uint256"}],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "name": "winningNumbers",
-    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
     "stateMutability": "view",
     "type": "function"
   }
 ];
 
+const RPC_URL = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
-const RPC_URL = process.env.NEXT_PUBLIC_BASE_RPC_URL || '';
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY || '';
+const CRON_SECRET = process.env.CRON_SECRET;
 
-async function fetchWinningNumbers(retries = 3): Promise<number[]> {
-  for (let attempt = 0; attempt < retries; attempt++) {
+const neynarEnabled = !!process.env.NEYNAR_API_KEY && !!process.env.NEYNAR_CLIENT_ID;
+
+// Function to fetch winning numbers with retries
+async function fetchWinningNumbers(): Promise<number[]> {
+  let attempts = 0;
+  const maxAttempts = 5;
+  while (attempts < maxAttempts) {
     try {
-      const response = await axios.get('https://xoso188.net/api/front/open/lottery/history/list/5/miba', {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-      const data = response.data;
-
-      if (!data.success || !data.t || !data.t.issueList || data.t.issueList.length === 0) {
-        throw new Error('Invalid API response: success=false or missing issueList');
+      const response = await axios.get('https://www.minhngoc.net.vn/ket-qua-xo-so/mien-bac.html');
+      const html = response.data;
+      const numbers = html.match(/<span class="giai_dac_biet">(\d{2})<\/span>/g) || [];
+      const winners = numbers.map((n: string) => parseInt(n.match(/\d{2}/)?.[0] || '0'));
+      if (winners.length === 5 && !winners.every((n: number) => n === 0)) {
+        return winners;
       }
-
-      const latest = data.t.issueList[0];
-      let detailArray: string[];
-      try {
-        detailArray = JSON.parse(latest.detail);
-      } catch (parseError) {
-        throw new Error('Failed to parse detail string as JSON');
-      }
-
-      if (!detailArray || detailArray.length < 8) {
-        throw new Error('Invalid detail array length');
-      }
-
-      const dbNumber = detailArray[0].slice(-2);
-      const g7Text = detailArray[7];
-      const g7Numbers = g7Text.split(',').map(n => n.trim()).filter(n => n.length === 2 && /^\d{2}$/.test(n));
-
-      const numbers = [...g7Numbers, dbNumber].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n < 100);
-
-      if (numbers.length === 5) {
-        console.log(`Fetched valid numbers: ${numbers}`);
-        return numbers;
-      }
-
-      console.log(`Attempt ${attempt + 1} failed: Invalid numbers`, numbers);
-      await new Promise(resolve => setTimeout(resolve, 300000)); // 5 min retry
-    } catch (error: any) {
-      console.error('API error:', error.message || error);
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error) {
+      console.error('Fetch error:', error);
+      attempts++;
     }
   }
-  console.error('All attempts failed to fetch valid numbers');
   return [];
 }
 
 export async function GET(request: NextRequest) {
-  // Check Bearer token from header Authorization
-  const authHeader = request.headers.get('authorization');
-  const token = authHeader ? authHeader.split('Bearer ')[1] : null;
+  const token = request.headers.get('Authorization')?.split('Bearer ')[1] || null;
 
-  if (!token || token !== process.env.CRON_SECRET) {
+  if (!token || token !== CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check time: Only run if after 12:00 UTC
   const now = new Date();
   const utcHour = now.getUTCHours();
   const utcMinute = now.getUTCMinutes();
-  if (utcHour < 12 || (utcHour === 12 && utcMinute < 0)) {
+  if (utcHour < 12 || (utcHour === 12 && utcMinute < 30)) {
     return NextResponse.json({ success: false, message: 'Too early for results' }, { status: 200 });
   }
 
@@ -308,20 +584,18 @@ export async function GET(request: NextRequest) {
         console.error('Failed to fetch valid winners after retries');
         return NextResponse.json({ success: false, message: 'Invalid winners data after retries' }, { status: 500 });
       }
-      // Đề xuất an toàn: Check if winners all zero (invalid)
-      const isAllZero = winners.every(n => n === 0);
+      const isAllZero = winners.every((n: number) => n === 0);
       if (isAllZero) {
         console.error('Winners all zero - invalid, skipping set');
         return NextResponse.json({ success: false, message: 'Invalid all-zero winners' }, { status: 200 });
       }
 
-      // Thêm check ngăn set winners lặp (so sánh với round trước)
       if (currentRound > 1) {
-        const prevWinners: number[] = [];  // Fix: Explicit type number[] để tránh error implicit any[]
+        const prevWinners: number[] = [];
         for (let i = 0; i < 5; i++) {
           prevWinners.push(Number(await contract.winningNumbers(currentRound - 1, i)));
         }
-        const isSameAsPrev = winners.every((num, idx) => num === prevWinners[idx]);
+        const isSameAsPrev = winners.every((num: number, idx: number) => num === prevWinners[idx]);
         if (isSameAsPrev) {
           console.log(`Winners for round ${currentRound} same as round ${currentRound - 1}, skipping set`);
           return NextResponse.json({ success: false, message: 'Winners identical to previous round' }, { status: 200 });
@@ -332,7 +606,6 @@ export async function GET(request: NextRequest) {
       await txSet.wait();
       console.log(`Round ${currentRound} closed with winners: ${winners}`);
 
-      // Filter winners and notify
       const winningSet = new Set(winners);
       const winnersMap = new Map<string, number>();
       for (let num = 0; num < 100; num++) {
@@ -342,16 +615,15 @@ export async function GET(request: NextRequest) {
           winnersMap.set(addr, currentMatches + 1);
         }
       }
-      // Đề xuất: Log winnersMap size để debug
       console.log(`Winners map size for round ${currentRound}: ${winnersMap.size}`);
 
       const rewardPerMatch = Number(await contract.rewardPerMatch());
       for (const [addr, matches] of winnersMap.entries()) {
         const fid = await getFidByAddress(addr);
         if (fid) {
-          const amount = (matches * rewardPerMatch) / 1e6; // USDC 6 decimals
+          const amount = (matches * rewardPerMatch) / 1e6;
           const result = await sendNeynarMiniAppNotification({
-            fid,
+            fids: [fid],
             title: "Congratulations! You won in MINIIS3",
             body: `You matched ${matches} numbers and won ${amount} USDC. Go to the app to claim your reward.`,
           });
@@ -362,10 +634,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Always start new round (if closed or after close)
     const txStart = await contract.startNewRound();
     await txStart.wait();
     console.log('New round started');
+
+    const title = 'New Round Started!';
+    const body = 'The new round of MINIIS3 has begun! Pick your lucky number now.';
+    let broadcastResult;
+    if (neynarEnabled) {
+      broadcastResult = await sendNeynarMiniAppNotification({ fids: [], title, body });
+    } else {
+      const fids = await getAllUserFids();
+      broadcastResult = [];
+      for (const fid of fids) {
+        const res = await sendMiniAppNotification({ fid, title, body });
+        broadcastResult.push({ fid, res });
+      }
+    }
+    console.log('Broadcast notification result:', broadcastResult);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
