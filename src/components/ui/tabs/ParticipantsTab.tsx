@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { ethers } from 'ethers';
-import { getParticipantsForRound, addParticipantToRound } from "~/lib/kv"; // Import both KV functions for Redis fetch and add
+import { getParticipantsForRound } from "~/lib/kv"; // Chỉ import getParticipantsForRound từ KV
 
 export function ParticipantsTab() {
   const [participants, setParticipants] = useState<{ number: string; user: string; round: string }[]>([]);
@@ -19,68 +19,14 @@ export function ParticipantsTab() {
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
-        'function currentRound() view returns (uint256)',
-        'function selectedNumbers(uint256 round, uint8 number) view returns (address)'
-      ], provider);
+        'function currentRound() view returns (uint256)'
+      ], provider); // Chỉ cần currentRound, không cần selectedNumbers nữa vì loại bỏ fallback
       const round = Number(await contract.currentRound());
       setCurrentRound(round);
 
-      // Fetch from Redis first
+      // Chỉ fetch từ Redis (loại bỏ fallback Neynar và contract scan)
       const cachedParts = await getParticipantsForRound(round);
-      if (cachedParts.length > 0) {
-        setParticipants(cachedParts.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
-        setError(null);
-        setLoading(false);
-        return; // Cache hit
-      }
-
-      // Fallback if Redis empty: Fetch from contract/Neynar and cache
-      const numPromises = Array.from({ length: 100 }, (_, num) => contract.selectedNumbers(round, num));
-      const addresses = await Promise.all(numPromises);
-      const parts = addresses
-        .map((addr, num) => addr !== ethers.ZeroAddress ? { number: num.toString().padStart(2, '0'), user: addr, round: round.toString() } : null)
-        .filter(Boolean) as { number: string; user: string; round: string }[];
-
-      const uniqueAddresses = [...new Set(parts.map(p => p.user.toLowerCase()))];
-      const fidsResponse = await fetch('/api/get-fids', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses: uniqueAddresses }),
-      });
-      if (!fidsResponse.ok) throw new Error('Failed to fetch fids');
-      const fidsMap = await fidsResponse.json();
-
-      const fids = Object.values(fidsMap).filter(fid => fid);
-      let usersMap: { [fid: number]: { username: string; display_name: string } } = {};
-      if (fids.length > 0) {
-        try {
-          const usersResponse = await fetch('/api/get-users', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fids }),
-          });
-          if (!usersResponse.ok) throw new Error('Failed to fetch users');
-          usersMap = await usersResponse.json();
-        } catch (fetchErr) {
-          console.error('Neynar fetch error:', fetchErr);
-          // Fallback: Use addresses if fail
-        }
-      }
-
-      parts.forEach(part => {
-        const fid = fidsMap[part.user.toLowerCase()];
-        if (fid) {
-          const userInfo = usersMap[fid];
-          part.user = userInfo?.username ? `@${userInfo.username}` : truncateAddress(part.user);
-        } else {
-          part.user = truncateAddress(part.user);
-        }
-      });
-
-      // Cache to Redis after fallback fetch
-      await Promise.all(parts.map(p => addParticipantToRound(round, { number: p.number, address: p.user.includes('...') ? p.user : '', fid: fidsMap[p.user], username: p.user.startsWith('@') ? p.user.slice(1) : '' })));
-
-      setParticipants(parts.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
+      setParticipants(cachedParts.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
       setError(null);
     } catch (err) {
       console.error('Error refreshing participants:', err);
@@ -90,8 +36,6 @@ export function ParticipantsTab() {
       setLoading(false);
     }
   };
-
-  const truncateAddress = (addr: string) => addr.slice(0, 6) + '...' + addr.slice(-4);
 
   const fullList = Array.from({ length: 100 }, (_, i) => {
     const num = i.toString().padStart(2, '0');
