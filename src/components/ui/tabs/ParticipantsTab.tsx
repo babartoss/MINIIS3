@@ -1,49 +1,97 @@
-// src/components/ui/tabs/ParticipantsTab.tsx
+// src/components/ParticipantsTab.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ethers } from 'ethers';
-import { getParticipantsForRound } from "~/lib/kv";
 
 export function ParticipantsTab() {
   const [participants, setParticipants] = useState<{ number: string; user: string; round: string }[]>([]);
   const [currentRound, setCurrentRound] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Thêm loading state cho button
 
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
   const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 
-  const fetchData = async () => {
+  const CACHE_KEY = (round: number) => `participants_round_${round}`; // Key cache per round
+
+  const fetchParticipants = async (forceRefresh = false) => {
     setLoading(true);
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
-        'function currentRound() view returns (uint256)'
+        'function currentRound() view returns (uint256)',
+        'function selectedNumbers(uint256 round, uint8 number) view returns (address)'
       ], provider);
-      const newRound = Number(await contract.currentRound());
+      const round = Number(await contract.currentRound());
+      setCurrentRound(round);
 
-      if (newRound !== currentRound) {
-        setParticipants([]); // Reset danh sách nếu round mới
-        setCurrentRound(newRound);
+      // Check cache đầu tiên (localStorage)
+      const cachedData = localStorage.getItem(CACHE_KEY(round));
+      if (cachedData && !forceRefresh) {
+        setParticipants(JSON.parse(cachedData));
+        setError(null);
+        setLoading(false);
+        return;
       }
 
-      const cachedParts = await getParticipantsForRound(newRound);
-      setParticipants(cachedParts.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
+      // Fetch on-chain (batch)
+      const numPromises = Array.from({ length: 100 }, (_, num) => contract.selectedNumbers(round, num));
+      const addresses = await Promise.all(numPromises);
+      const parts = addresses
+        .map((addr, num) => addr !== ethers.ZeroAddress ? { number: num.toString().padStart(2, '0'), user: addr, round: round.toString() } : null)
+        .filter(Boolean) as { number: string; user: string; round: string }[];
+
+      // Fetch FIDs và users (giữ nguyên, nhưng chỉ gọi khi không cache)
+      const uniqueAddresses = [...new Set(parts.map(p => p.user.toLowerCase()))];
+      const fidsResponse = await fetch('/api/get-fids', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses: uniqueAddresses }),
+      });
+      if (!fidsResponse.ok) throw new Error('Failed to fetch fids');
+      const fidsMap = await fidsResponse.json();
+
+      const fids = Object.values(fidsMap).filter(fid => fid);
+      let usersMap: { [fid: number]: { username: string; display_name: string } } = {};
+      if (fids.length > 0) {
+        const usersResponse = await fetch('/api/get-users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fids }),
+        });
+        if (!usersResponse.ok) throw new Error('Failed to fetch users');
+        usersMap = await usersResponse.json();
+      }
+
+      parts.forEach(part => {
+        const fid = fidsMap[part.user.toLowerCase()];
+        if (fid) {
+          const userInfo = usersMap[fid];
+          part.user = userInfo?.username ? `@${userInfo.username}` : truncateAddress(part.user);
+        } else {
+          part.user = truncateAddress(part.user);
+        }
+      });
+
+      const sortedParts = parts.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+      setParticipants(sortedParts);
+      localStorage.setItem(CACHE_KEY(round), JSON.stringify(sortedParts)); // Cache
       setError(null);
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('Error fetching participants:', err);
       setError('Failed to load participants. Check console for details.');
+      setParticipants([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData(); // Load ban đầu
-    const interval = setInterval(fetchData, 30000); // Poll mỗi 30s để check round mới và update
-    return () => clearInterval(interval);
-  }, []);
+    fetchParticipants(); // Fetch ban đầu khi mount (dùng cache nếu có)
+  }, [contractAddress, rpcUrl]);
+
+  const truncateAddress = (addr: string) => addr.slice(0, 6) + '...' + addr.slice(-4);
 
   const fullList = Array.from({ length: 100 }, (_, i) => {
     const num = i.toString().padStart(2, '0');
@@ -59,10 +107,13 @@ export function ParticipantsTab() {
     <div className="mx-4 overflow-x-auto">
       <h2 className="text-lg font-semibold mb-4 text-center">Today&apos;s Participants</h2>
       {error && <p className="text-center text-red-500 mb-4">{error}</p>}
-      <button onClick={fetchData} disabled={loading} className="btn btn-primary mb-4">
-        {loading ? 'Refreshing...' : 'Refresh List'}
+      <button 
+        onClick={() => fetchParticipants(true)} // Force refresh khi nhấn
+        disabled={loading}
+        className="btn btn-primary mb-4 w-full" // Thêm style nếu cần
+      >
+        {loading ? 'Loading...' : 'Refresh Participants'}
       </button>
-      {participants.length === 0 && !loading && <p className="text-center text-gray-500 mb-4">Press Refresh to load participants.</p>}
       <table className="table-auto w-full bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md border-collapse">
         <thead>
           <tr className="bg-primary text-white">
@@ -81,7 +132,7 @@ export function ParticipantsTab() {
           ))}
         </tbody>
       </table>
-      {participants.length === 0 && !error && !loading && <p className="text-center text-gray-500 mt-4">No selections yet today.</p>}
+      {participants.length === 0 && !error && <p className="text-center text-gray-500 mt-4">No selections yet today.</p>}
     </div>
   );
 }

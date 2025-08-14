@@ -136,55 +136,57 @@ const Board: React.FC = () => {
           });
           setSelectHash(hash);
         } catch (error: any) {
-          console.error('Select number failed:', error);
-          setErrorMessage(`Select failed: ${error.message || 'Unknown error'}`);
-          setIsProcessing(false);
+          console.error('Select failed:', error);
+          setErrorMessage(`Select number failed: ${error.message || 'Unknown error'}`);
+          setApproveHash(null);
+          setIsProcessing(false); // Reset loading
         }
       })();
+    } else if (approveHash && approveReceipt.isError) {
+      setErrorMessage('Approve transaction failed.');
+      setApproveHash(null);
+      setIsProcessing(false);
     }
-  }, [approveReceipt.isSuccess, approveHash, selectedNumber, userAddress, selectNumAsync, contractAddress]);
+  }, [approveReceipt.isSuccess, approveReceipt.isError, approveHash, selectedNumber, userAddress, selectNumAsync, contractAddress]);
 
   useEffect(() => {
-    if (selectReceipt.isSuccess && selectedNumber !== null && userAddress) {
-      setTxHash(selectHash!);
-      setShowShare(true);
-      setSelectedNumbers(prev => new Set([...prev, selectedNumber]));
-      setErrorMessage(null);
-      setIsProcessing(false);
-      setShowConfirm(false);
+    if (selectHash && selectReceipt.isSuccess) {
+      const timestamp = new Date().toLocaleString();
+      const title = "Bet Placed Successfully!";
+      const body = `You selected number ${selectedNumber?.toString().padStart(2, '0')} for round ${currentRound} at ${timestamp}`;
 
-      // New: Push participant to Redis after success
-      const pushParticipant = async () => {
-        try {
-          const response = await fetch('/api/add-participant', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              round: currentRound,
-              number: selectedNumber.toString().padStart(2, '0'),
-              address: userAddress,
-              fid: fid, // From context
-              username: context?.user?.username, // Optional
-            }),
-          });
-          if (!response.ok) console.error('Failed to push participant');
-        } catch (err) {
-          console.error('Push participant error:', err);
-        }
-      };
-      pushParticipant();
+      fetch('/api/send-custom-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid, title, body }),
+      }).catch(err => console.error('Send notification failed:', err));
+
+      setTxHash(selectHash);
+      setShowShare(true);
+      setSelectHash(null);
+      setIsProcessing(false);
+    } else if (selectHash && selectReceipt.isError) {
+      setErrorMessage('Select transaction failed.');
+      setSelectHash(null);
+      setIsProcessing(false);
     }
-  }, [selectReceipt.isSuccess, selectHash, selectedNumber, userAddress, currentRound, fid, context?.user?.username]);
+  }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash, selectedNumber, currentRound, fid]);
 
   const handleSelect = (num: string) => {
-    if (isBetClosed || isRoundClosed || !isConnected || isProcessing) return;
+    if (isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected || isProcessing) return;
     setSelectedNumber(parseInt(num));
-    setShowConfirm(true);
+    setShowConfirm(true); // Show modal confirm instead of direct confirm
   };
 
   const handleConfirm = async () => {
-    setIsProcessing(true);
+    setShowConfirm(false);
+    if (isBetClosed || isRoundClosed || !selectedNumber || !userAddress || !isConnected) {
+      setErrorMessage('Bet closed, round ended, or invalid state.');
+      return;
+    }
+
     setErrorMessage(null);
+    setIsProcessing(true); // Start loading
     console.log('Starting handleConfirm - Chain ID:', chainId, 'Connected:', isConnected);
 
     if (chainId !== base.id) {
@@ -251,7 +253,7 @@ const Board: React.FC = () => {
             },
           ],
           functionName: 'selectNumber',
-          args: [selectedNumber!], // Added ! to assert non-null
+          args: [selectedNumber],
         });
         setSelectHash(hash);
       }

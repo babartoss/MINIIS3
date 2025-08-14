@@ -47,7 +47,7 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
       }
     };
     fetchRound();
-  }, [contractAddress, rpcUrl]); // Added missing dependencies
+  }, []);
 
   useEffect(() => {
     const params = `number=${selectedNumber.toString().padStart(2, '0')}&round=${round}&player=${encodeURIComponent(player)}&txHash=${txHash}`;
@@ -56,7 +56,7 @@ const ShareModal: React.FC<{ onClose: () => void; selectedNumber: number; txHash
 
     const imgUrl = `${baseUrl}/api/ticket-image?${params}`;
     setImageUrl(imgUrl);
-  }, [selectedNumber, round, player, txHash, baseUrl]); // Added missing dependency
+  }, [selectedNumber, round, player, txHash]);
 
   const castConfig = {
     text: `I just picked number ${selectedNumber.toString().padStart(2, '0')} in MINIIS3 Round ${round}! - @babartos`,
