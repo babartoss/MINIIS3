@@ -1,5 +1,6 @@
 import { NeynarAPIClient, Configuration, WebhookUserCreated } from '@neynar/nodejs-sdk';
 import { APP_URL } from './constants';
+import crypto from 'crypto';
 
 let neynarClient: NeynarAPIClient | null = null;
 
@@ -38,7 +39,7 @@ type SendMiniAppNotificationResult =
   | { state: "rate_limit" }
   | { state: "success" };
 
-// Updated: Support broadcast with fids: [] for all users who added the mini-app
+// Updated: Support broadcast with fids: [] for all users who added the mini-app, added uuid for notification
 export async function sendNeynarMiniAppNotification({
   fids = [],  // Empty array for broadcast to all eligible users
   title,
@@ -55,6 +56,7 @@ export async function sendNeynarMiniAppNotification({
       title,
       body,
       target_url: APP_URL,
+      uuid: crypto.randomUUID(),  // Added: Optional but helps avoid 400 errors
     };
 
     const result = await client.publishFrameNotifications({ 

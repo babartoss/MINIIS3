@@ -1,18 +1,21 @@
-// src/components/ParticipantsTab.tsx
+// src/components/ui/tabs/ParticipantsTab.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ethers } from 'ethers';
+import { getParticipantsForRound, addParticipantToRound } from "~/lib/kv"; // Import both KV functions for Redis fetch and add
 
 export function ParticipantsTab() {
   const [participants, setParticipants] = useState<{ number: string; user: string; round: string }[]>([]);
-  const [currentRound, setCurrentRound] = useState<number>(0);
+  const [_currentRound, setCurrentRound] = useState<number>(0); // Renamed to _currentRound to suppress unused var warning
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
   const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 
-  const fetchParticipants = async () => {
+  const refreshParticipants = async () => {
+    setLoading(true);
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
@@ -22,14 +25,22 @@ export function ParticipantsTab() {
       const round = Number(await contract.currentRound());
       setCurrentRound(round);
 
-      // Batch fetch selectedNumbers to reduce calls (Promise.all for 100 nums)
+      // Fetch from Redis first
+      const cachedParts = await getParticipantsForRound(round);
+      if (cachedParts.length > 0) {
+        setParticipants(cachedParts.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
+        setError(null);
+        setLoading(false);
+        return; // Cache hit
+      }
+
+      // Fallback if Redis empty: Fetch from contract/Neynar and cache
       const numPromises = Array.from({ length: 100 }, (_, num) => contract.selectedNumbers(round, num));
       const addresses = await Promise.all(numPromises);
       const parts = addresses
         .map((addr, num) => addr !== ethers.ZeroAddress ? { number: num.toString().padStart(2, '0'), user: addr, round: round.toString() } : null)
         .filter(Boolean) as { number: string; user: string; round: string }[];
 
-      // Fetch FID and usernames
       const uniqueAddresses = [...new Set(parts.map(p => p.user.toLowerCase()))];
       const fidsResponse = await fetch('/api/get-fids', {
         method: 'POST',
@@ -42,13 +53,18 @@ export function ParticipantsTab() {
       const fids = Object.values(fidsMap).filter(fid => fid);
       let usersMap: { [fid: number]: { username: string; display_name: string } } = {};
       if (fids.length > 0) {
-        const usersResponse = await fetch('/api/get-users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fids }),
-        });
-        if (!usersResponse.ok) throw new Error('Failed to fetch users');
-        usersMap = await usersResponse.json();
+        try {
+          const usersResponse = await fetch('/api/get-users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fids }),
+          });
+          if (!usersResponse.ok) throw new Error('Failed to fetch users');
+          usersMap = await usersResponse.json();
+        } catch (fetchErr) {
+          console.error('Neynar fetch error:', fetchErr);
+          // Fallback: Use addresses if fail
+        }
       }
 
       parts.forEach(part => {
@@ -61,20 +77,19 @@ export function ParticipantsTab() {
         }
       });
 
+      // Cache to Redis after fallback fetch
+      await Promise.all(parts.map(p => addParticipantToRound(round, { number: p.number, address: p.user.includes('...') ? p.user : '', fid: fidsMap[p.user], username: p.user.startsWith('@') ? p.user.slice(1) : '' })));
+
       setParticipants(parts.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
       setError(null);
     } catch (err) {
-      console.error('Error fetching participants:', err);
+      console.error('Error refreshing participants:', err);
       setError('Failed to load participants. Check console for details.');
       setParticipants([]);
+    } finally {
+      setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchParticipants();
-    const interval = setInterval(fetchParticipants, 30000);
-    return () => clearInterval(interval);
-  }, [contractAddress, rpcUrl]);
 
   const truncateAddress = (addr: string) => addr.slice(0, 6) + '...' + addr.slice(-4);
 
@@ -92,6 +107,14 @@ export function ParticipantsTab() {
     <div className="mx-4 overflow-x-auto">
       <h2 className="text-lg font-semibold mb-4 text-center">Today&apos;s Participants</h2>
       {error && <p className="text-center text-red-500 mb-4">{error}</p>}
+      <button 
+        onClick={refreshParticipants}
+        disabled={loading}
+        className="btn btn-primary mb-4"
+      >
+        {loading ? 'Refreshing...' : 'Refresh List'}
+      </button>
+      {participants.length === 0 && !loading && <p className="text-center text-gray-500 mb-4">Press Refresh to load participants.</p>}
       <table className="table-auto w-full bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md border-collapse">
         <thead>
           <tr className="bg-primary text-white">
@@ -110,7 +133,7 @@ export function ParticipantsTab() {
           ))}
         </tbody>
       </table>
-      {participants.length === 0 && !error && <p className="text-center text-gray-500 mt-4">No selections yet today.</p>}
+      {participants.length === 0 && !error && !loading && <p className="text-center text-gray-500 mt-4">No selections yet today.</p>}
     </div>
   );
 }

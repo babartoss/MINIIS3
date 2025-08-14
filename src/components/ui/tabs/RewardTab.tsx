@@ -1,7 +1,7 @@
-// src/components/RewardTab.tsx
+// src/components/ui/tabs/RewardTab.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react"; // Added useCallback
 import { ethers } from 'ethers';
 import { useAccount, useWriteContract } from 'wagmi';
 
@@ -23,7 +23,7 @@ export function RewardTab() {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
-  const fetchRewards = async () => {
+  const fetchRewards = useCallback(async () => {
     if (!userAddress) return;
     setIsLoading(true);
     setError(null);
@@ -47,49 +47,51 @@ export function RewardTab() {
       for (let round = currentRound; round >= Math.max(1, currentRound - 9); round--) {
         const isClosed = await contract.roundClosed(round);
         if (isClosed) {
-          // Fix: Loop to fetch each winningNumbers(round, i) vì ABI là per index
-          const wNums = [];
+          // Fetch winning numbers
+          const winningNums = [];
           for (let i = 0; i < 5; i++) {
-            wNums.push(await contract.winningNumbers(round, i));
+            winningNums.push(Number(await contract.winningNumbers(round, i)));
           }
 
-          const prizes = [];
-          for (let j = 0; j < 5; j++) {
-            const numValue = Number(wNums[j]);
-            const num = numValue.toString().padStart(2, '0');
-            const winnerAddr = await contract.selectedNumbers(round, numValue);
-            prizes.push({
-              prizeIndex: j + 1,
-              number: num,
+          // Use Promise.all for async map
+          const prizes = await Promise.all(winningNums.map(async (winNum, prizeIndex) => {
+            const winnerAddr = winNum !== 255 ? await contract.selectedNumbers(round, winNum) : ethers.ZeroAddress;
+            return {
+              prizeIndex: prizeIndex + 1,
+              number: winNum.toString().padStart(2, '0'),
               winner: winnerAddr === ethers.ZeroAddress ? "No Winner" : winnerAddr,
-            });
-          }
+            };
+          }));
+
           const hasClaimed = await contract.hasClaimed(round, userAddress);
-          userRewards.push({
-            round,
-            prizes,
-            claimed: hasClaimed,
-          });
+          const userMatches = prizes.filter(p => p.winner.toLowerCase() === userAddress?.toLowerCase()).length;
+
+          if (userMatches > 0 || true) { // Always show recent rounds, even if no win
+            userRewards.push({ round, prizes, claimed: hasClaimed });
+          }
         }
       }
-      setRewards(userRewards);
-    } catch (error: any) {
-      console.error("Failed to fetch rewards:", error);
-      setError(`Failed to load rewards: ${error.message || 'Unknown error'}`);
+
+      setRewards(userRewards.sort((a, b) => b.round - a.round)); // Recent first
+    } catch (err) {
+      console.error('Error fetching rewards:', err);
+      setError('Failed to load rewards. Check console for details.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userAddress]); // Dependencies for useCallback
 
   useEffect(() => {
-    fetchRewards();
-  }, [userAddress, contractAddress, rpcUrl]);
+    if (isConnected && userAddress) {
+      fetchRewards();
+    }
+  }, [isConnected, userAddress, fetchRewards]); // Now stable
 
   const handleClaim = async (round: number) => {
-    if (loadingClaim !== null) return;
     setLoadingClaim(round);
+    setError(null);
     try {
-      await claimRewardAsync({
+      const hash = await claimRewardAsync({
         address: contractAddress,
         abi: [
           {
@@ -101,78 +103,78 @@ export function RewardTab() {
           },
         ],
         functionName: 'claimReward',
-        args: [BigInt(round)],  // Fix: Convert number to bigint for uint256
+        args: [BigInt(round)],
       });
-      // Refresh sau claim thành công
-      fetchRewards();
-    } catch (error: any) {
-      console.error('Claim failed:', error);
-      setError(`Claim failed: ${error.message || 'Unknown error'}`);
+      console.log('Claim tx hash:', hash);
+      // Wait for receipt or poll
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Simple wait, or use waitForTransaction
+      await fetchRewards(); // Refresh after claim
+    } catch (err: any) {
+      console.error('Claim error:', err);
+      setError(`Claim failed: ${err.message || 'Unknown error'}`);
     } finally {
       setLoadingClaim(null);
     }
   };
 
   return (
-    <div className="flex flex-col items-center">
-      <button
-        onClick={fetchRewards}
-        disabled={isLoading || !isConnected}
-        className="btn btn-primary mb-4 px-4 py-2 disabled:opacity-50"
-      >
-        {isLoading ? 'Refreshing...' : 'Refresh Rewards'}
-      </button>
-      {error && <div className="bg-red-500 text-white p-2 mb-4 rounded">{error}</div>}
-      <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
-        {rewards.map((reward, index) => {
-          const userMatches = reward.prizes.filter(p => p.winner.toLowerCase() === userAddress?.toLowerCase()).length;
-          return (
-            <div key={index} className="mb-6 border-b pb-4 last:border-b-0">
-              <h3 className="font-bold text-xl mb-3 text-center">Round {reward.round}</h3>
-              <div className="overflow-x-auto">
-                <table className="table-auto w-full bg-white dark:bg-gray-700 rounded-lg shadow-md border-collapse">
-                  <thead>
-                    <tr className="bg-primary text-white">
-                      <th className="px-4 py-2 border-b text-left">Prize</th>
-                      <th className="px-4 py-2 border-b text-left">Number</th>
-                      <th className="px-4 py-2 border-b text-left">Winner</th>
-                      <th className="px-4 py-2 border-b text-left">Reward</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reward.prizes.map((prize, prizeIndex) => (
-                      <tr 
-                        key={prize.prizeIndex} 
-                        className={`${prizeIndex % 2 === 0 ? 'bg-gray-50 dark:bg-gray-600' : 'bg-white dark:bg-gray-700'} hover:bg-gray-200 dark:hover:bg-gray-500 ${prize.winner.toLowerCase() === userAddress?.toLowerCase() ? "bg-green-100 dark:bg-green-800" : ""}`}
-                      >
-                        <td className="px-4 py-2 border-b text-sm font-medium">Prize {prize.prizeIndex}</td>
-                        <td className="px-4 py-2 border-b text-sm text-red-500 font-bold">{prize.number}</td>
-                        <td className="px-4 py-2 border-b text-sm">{shortenAddress(prize.winner)}</td>
-                        <td className="px-4 py-2 border-b text-sm">
-                          {prize.winner !== "No Winner" ? `${rewardPerUSDC.toFixed(2)} USDC` : "-"}
-                        </td>
+    <div className="mx-4 overflow-x-auto">
+      <h2 className="text-lg font-semibold mb-4 text-center">Your Rewards</h2>
+      {error && <p className="text-center text-red-500 mb-4">{error}</p>}
+      {isLoading ? (
+        <p className="text-center text-gray-500">Loading rewards...</p>
+      ) : (
+        <div className="space-y-6">
+          {rewards.map((reward, index) => {
+            const userMatches = reward.prizes.filter(p => p.winner.toLowerCase() === userAddress?.toLowerCase()).length;
+            return (
+              <div key={index} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                <h3 className="text-md font-bold mb-3 text-center">Round {reward.round} - {userMatches} Matches</h3>
+                <div className="overflow-x-auto">
+                  <table className="table-auto w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-primary text-white">
+                        <th className="px-4 py-2 border-b text-left">Prize</th>
+                        <th className="px-4 py-2 border-b text-left">Number</th>
+                        <th className="px-4 py-2 border-b text-left">Winner</th>
+                        <th className="px-4 py-2 border-b text-left">Reward</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 text-center">Status: {reward.claimed ? 'Claimed' : 'Available'}</p>
-              {!reward.claimed && userMatches > 0 && (
-                <div className="flex justify-center mt-3">
-                  <button
-                    onClick={() => handleClaim(reward.round)}
-                    disabled={loadingClaim === reward.round}
-                    className="btn btn-primary px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
-                  >
-                    {loadingClaim === reward.round ? 'Claiming...' : 'Claim Reward'}
-                  </button>
+                    </thead>
+                    <tbody>
+                      {reward.prizes.map((prize, prizeIndex) => (
+                        <tr 
+                          key={prizeIndex} 
+                          className={`${prizeIndex % 2 === 0 ? 'bg-gray-50 dark:bg-gray-600' : 'bg-white dark:bg-gray-700'} hover:bg-gray-200 dark:hover:bg-gray-500 ${prize.winner.toLowerCase() === userAddress?.toLowerCase() ? "bg-green-100 dark:bg-green-800" : ""}`}
+                        >
+                          <td className="px-4 py-2 border-b text-sm font-medium">Prize {prize.prizeIndex}</td>
+                          <td className="px-4 py-2 border-b text-sm text-red-500 font-bold">{prize.number}</td>
+                          <td className="px-4 py-2 border-b text-sm">{shortenAddress(prize.winner)}</td>
+                          <td className="px-4 py-2 border-b text-sm">
+                            {prize.winner !== "No Winner" ? `${rewardPerUSDC.toFixed(2)} USDC` : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </div>
-          );
-        })}
-        {rewards.length === 0 && <p className="text-center text-gray-500">No rewards available yet.</p>}
-      </div>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 text-center">Status: {reward.claimed ? 'Claimed' : 'Available'}</p>
+                {!reward.claimed && userMatches > 0 && (
+                  <div className="flex justify-center mt-3">
+                    <button
+                      onClick={() => handleClaim(reward.round)}
+                      disabled={loadingClaim === reward.round}
+                      className="btn btn-primary px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                    >
+                      {loadingClaim === reward.round ? 'Claiming...' : 'Claim Reward'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {rewards.length === 0 && <p className="text-center text-gray-500">No rewards available yet.</p>}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+// src/lib/kv.ts
 import { Redis } from '@upstash/redis';
 
 const redis = Redis.fromEnv();
@@ -33,4 +34,29 @@ export async function addUserFid(fid: number) {
 export async function getAllUserFids(): Promise<number[]> {
   const members = await redis.smembers(`${PREFIX}users`);
   return members.map(Number);
+}
+
+// New: Add participant to round list (use hash or JSON array for simplicity)
+export async function addParticipantToRound(round: number, data: { number: string; address: string; fid?: number; username?: string }) {
+  const key = `${PREFIX}participants_round_${round}`;
+  const currentList = await redis.get(key);
+  const list = currentList ? JSON.parse(currentList as string) : [];
+  // Avoid duplicate by number
+  if (!list.some((p: any) => p.number === data.number)) {
+    list.push(data);
+    await redis.set(key, JSON.stringify(list));
+    await redis.expire(key, 86400); // TTL 1 day for round data
+  }
+}
+
+// New: Get participants for round from Redis
+export async function getParticipantsForRound(round: number): Promise<{ number: string; user: string; round: string }[]> {
+  const key = `${PREFIX}participants_round_${round}`;
+  const data = await redis.get(key);
+  return data ? JSON.parse(data as string).map((p: any) => ({ number: p.number, user: p.username || truncateAddress(p.address), round: round.toString() })) : [];
+}
+
+// Helper truncate
+function truncateAddress(addr: string) {
+  return addr.slice(0, 6) + '...' + addr.slice(-4);
 }
