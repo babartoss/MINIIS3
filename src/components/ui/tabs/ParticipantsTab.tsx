@@ -1,41 +1,49 @@
 // src/components/ui/tabs/ParticipantsTab.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ethers } from 'ethers';
-import { getParticipantsForRound } from "~/lib/kv"; // Chỉ import getParticipantsForRound từ KV
+import { getParticipantsForRound } from "~/lib/kv";
 
 export function ParticipantsTab() {
   const [participants, setParticipants] = useState<{ number: string; user: string; round: string }[]>([]);
-  const [_currentRound, setCurrentRound] = useState<number>(0); // Renamed to _currentRound to suppress unused var warning
+  const [currentRound, setCurrentRound] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
   const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 
-  const refreshParticipants = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
         'function currentRound() view returns (uint256)'
-      ], provider); // Chỉ cần currentRound, không cần selectedNumbers nữa vì loại bỏ fallback
-      const round = Number(await contract.currentRound());
-      setCurrentRound(round);
+      ], provider);
+      const newRound = Number(await contract.currentRound());
 
-      // Chỉ fetch từ Redis (loại bỏ fallback Neynar và contract scan)
-      const cachedParts = await getParticipantsForRound(round);
+      if (newRound !== currentRound) {
+        setParticipants([]); // Reset danh sách nếu round mới
+        setCurrentRound(newRound);
+      }
+
+      const cachedParts = await getParticipantsForRound(newRound);
       setParticipants(cachedParts.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
       setError(null);
     } catch (err) {
-      console.error('Error refreshing participants:', err);
+      console.error('Error fetching data:', err);
       setError('Failed to load participants. Check console for details.');
-      setParticipants([]);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData(); // Load ban đầu
+    const interval = setInterval(fetchData, 30000); // Poll mỗi 30s để check round mới và update
+    return () => clearInterval(interval);
+  }, []);
 
   const fullList = Array.from({ length: 100 }, (_, i) => {
     const num = i.toString().padStart(2, '0');
@@ -51,11 +59,7 @@ export function ParticipantsTab() {
     <div className="mx-4 overflow-x-auto">
       <h2 className="text-lg font-semibold mb-4 text-center">Today&apos;s Participants</h2>
       {error && <p className="text-center text-red-500 mb-4">{error}</p>}
-      <button 
-        onClick={refreshParticipants}
-        disabled={loading}
-        className="btn btn-primary mb-4"
-      >
+      <button onClick={fetchData} disabled={loading} className="btn btn-primary mb-4">
         {loading ? 'Refreshing...' : 'Refresh List'}
       </button>
       {participants.length === 0 && !loading && <p className="text-center text-gray-500 mb-4">Press Refresh to load participants.</p>}
