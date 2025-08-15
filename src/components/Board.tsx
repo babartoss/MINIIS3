@@ -115,91 +115,83 @@ const Board: React.FC = () => {
     return () => clearInterval(interval);
   }, [contractAddress, rpcUrl]);
 
+  // Handle after approve success: automatically select number
   useEffect(() => {
-    if (approveHash && approveReceipt.isSuccess && selectedNumber !== null && userAddress) {
-      (async () => {
-        try {
-          console.log('Approve confirmed, selecting number');
-          const hash = await selectNumAsync({
-            address: contractAddress,
-            abi: [
-              {
-                name: 'selectNumber',
-                type: 'function',
-                inputs: [{ name: 'number', type: 'uint8' }],
-                outputs: [],
-                stateMutability: 'nonpayable',
-              },
-            ],
-            functionName: 'selectNumber',
-            args: [selectedNumber],
-          });
-          setSelectHash(hash);
-        } catch (error: any) {
-          console.error('Select failed:', error);
-          setErrorMessage(`Select number failed: ${error.message || 'Unknown error'}`);
-          setApproveHash(null);
-          setIsProcessing(false); // Reset loading
-        }
-      })();
-    } else if (approveHash && approveReceipt.isError) {
-      setErrorMessage('Approve transaction failed.');
-      setApproveHash(null);
+    if (approveReceipt.isSuccess && selectedNumber !== null && !isProcessing) {
+      console.log('Approve successful, now selecting number');
+      selectNumAsync({
+        address: contractAddress,
+        abi: [
+          {
+            name: 'selectNumber',
+            type: 'function',
+            inputs: [{ name: 'number', type: 'uint8' }],
+            outputs: [],
+            stateMutability: 'nonpayable',
+          },
+        ],
+        functionName: 'selectNumber',
+        args: [selectedNumber],
+      })
+        .then(hash => setSelectHash(hash))
+        .catch(err => {
+          setErrorMessage(`Select failed: ${err.message}`);
+          setIsProcessing(false);
+        });
+    }
+    if (approveReceipt.isError) {
+      setErrorMessage(`Approve failed: ${approveReceipt.error?.message || 'Unknown error'}`);
       setIsProcessing(false);
     }
-  }, [approveReceipt.isSuccess, approveReceipt.isError, approveHash, selectedNumber, userAddress, selectNumAsync, contractAddress]);
+  }, [approveReceipt.isSuccess, approveReceipt.isError, selectedNumber, selectNumAsync, approveReceipt.error]);
 
+  // Handle after select success: show share, send notification to user
   useEffect(() => {
-    if (selectHash && selectReceipt.isSuccess) {
-      const timestamp = new Date().toLocaleString();
-      const title = "Bet Placed Successfully!";
-      const body = `You selected number ${selectedNumber?.toString().padStart(2, '0')} for round ${currentRound} at ${timestamp}`;
-
-      fetch('/api/send-custom-notification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fid, title, body }),
-      }).catch(err => console.error('Send notification failed:', err));
-
+    if (selectReceipt.isSuccess) {
+      console.log('Select successful');
+      setIsProcessing(false);
       setTxHash(selectHash);
       setShowShare(true);
-      setSelectHash(null);
-      setIsProcessing(false);
-    } else if (selectHash && selectReceipt.isError) {
-      setErrorMessage('Select transaction failed.');
-      setSelectHash(null);
+
+      // Send notification to the specific user (using their FID)
+      if (fid && selectedNumber !== null) {
+        fetch('/api/send-custom-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fid,
+            title: 'Bet Placed Successfully!',
+            body: `You have successfully selected number ${selectedNumber.toString().padStart(2, '0')} in round ${currentRound}. Transaction: ${selectHash}`,
+          }),
+        })
+          .then(response => {
+            if (!response.ok) {
+              console.error('Failed to send notification');
+            }
+          })
+          .catch(err => console.error('Error sending notification:', err));
+      }
+    }
+    if (selectReceipt.isError) {
+      setErrorMessage(`Select failed: ${selectReceipt.error?.message || 'Unknown error'}`);
       setIsProcessing(false);
     }
-  }, [selectReceipt.isSuccess, selectReceipt.isError, selectHash, selectedNumber, currentRound, fid]);
+  }, [selectReceipt.isSuccess, selectReceipt.isError, fid, selectedNumber, currentRound, selectHash, selectReceipt.error]);
 
   const handleSelect = (num: string) => {
-    if (isBetClosed || isRoundClosed || selectedNumbers.has(parseInt(num)) || !isConnected || isProcessing) return;
-    setSelectedNumber(parseInt(num));
-    setShowConfirm(true); // Show modal confirm instead of direct confirm
+    if (!isConnected || isBetClosed || isRoundClosed || isProcessing) return;
+    const number = parseInt(num);
+    if (!selectedNumbers.has(number)) {
+      setSelectedNumber(number);
+      setShowConfirm(true);
+    }
   };
 
   const handleConfirm = async () => {
     setShowConfirm(false);
-    if (isBetClosed || isRoundClosed || !selectedNumber || !userAddress || !isConnected) {
-      setErrorMessage('Bet closed, round ended, or invalid state.');
-      return;
-    }
-
+    if (selectedNumber === null || !userAddress) return;
+    setIsProcessing(true);
     setErrorMessage(null);
-    setIsProcessing(true); // Start loading
-    console.log('Starting handleConfirm - Chain ID:', chainId, 'Connected:', isConnected);
-
-    if (chainId !== base.id) {
-      console.log('Switching to Base Mainnet');
-      try {
-        await switchChain({ chainId: base.id });
-      } catch (error: any) {
-        console.error('Switch chain failed:', error);
-        setErrorMessage(`Failed to switch chain: ${error.message || 'Unknown error. Ensure wallet supports Base mainnet.'}`);
-        setIsProcessing(false);
-        return;
-      }
-    }
 
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const usdcContract = new ethers.Contract(usdcAddress, [
