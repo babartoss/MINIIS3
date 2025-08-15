@@ -29,7 +29,7 @@ export function Header({ neynarUser }: HeaderProps) {
   const [roundNumber, setRoundNumber] = useState(1);
   const [poolBalance, setPoolBalance] = useState<string>('0');
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
-  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://sepolia.base.org';
+  const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 
   useEffect(() => {
     // Fetch current round from contract
