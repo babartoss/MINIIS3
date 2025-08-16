@@ -20,13 +20,12 @@ export function ParticipantsTab() {
     try {
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       const contract = new ethers.Contract(contractAddress, [
-        'function currentRound() view returns (uint256)',
-        'function selectedNumbers(uint256 round, uint8 number) view returns (address)'
+        'function currentRound() view returns (uint256)'
       ], provider);
       const round = Number(await contract.currentRound());
       setCurrentRound(round);
 
-      // Check cache đầu tiên (localStorage)
+      // Check localStorage cache first
       const cachedData = localStorage.getItem(CACHE_KEY(round));
       if (cachedData && !forceRefresh) {
         setParticipants(JSON.parse(cachedData));
@@ -35,48 +34,24 @@ export function ParticipantsTab() {
         return;
       }
 
-      // Fetch on-chain (batch)
-      const numPromises = Array.from({ length: 100 }, (_, num) => contract.selectedNumbers(round, num));
-      const addresses = await Promise.all(numPromises);
-      const parts = addresses
-        .map((addr, num) => addr !== ethers.ZeroAddress ? { number: num.toString().padStart(2, '0'), user: addr, round: round.toString() } : null)
-        .filter(Boolean) as { number: string; user: string; round: string }[];
+      // Fetch from Redis via API
+      const response = await fetch(`/api/get-participants?round=${round}`);
+      if (!response.ok) throw new Error('Failed to fetch participants from Redis');
+      const redisParticipants = await response.json();
 
-      // Fetch FIDs và users (giữ nguyên, nhưng chỉ gọi khi không cache)
-      const uniqueAddresses = [...new Set(parts.map(p => p.user.toLowerCase()))];
-      const fidsResponse = await fetch('/api/get-fids', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses: uniqueAddresses }),
-      });
-      if (!fidsResponse.ok) throw new Error('Failed to fetch fids');
-      const fidsMap = await fidsResponse.json();
-
-      const fids = Object.values(fidsMap).filter(fid => fid);
-      let usersMap: { [fid: number]: { username: string; display_name: string } } = {};
-      if (fids.length > 0) {
-        const usersResponse = await fetch('/api/get-users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fids }),
-        });
-        if (!usersResponse.ok) throw new Error('Failed to fetch users');
-        usersMap = await usersResponse.json();
-      }
-
-      parts.forEach(part => {
-        const fid = fidsMap[part.user.toLowerCase()];
-        if (fid) {
-          const userInfo = usersMap[fid];
-          part.user = userInfo?.username ? `@${userInfo.username}` : truncateAddress(part.user);
-        } else {
-          part.user = truncateAddress(part.user);
-        }
+      // Format for display
+      const fullList = Array.from({ length: 100 }, (_, i) => {
+        const num = i.toString().padStart(2, '0');
+        const part = redisParticipants.find((p: any) => p.number === num);
+        return {
+          number: num,
+          user: part ? (part.username ? `@${part.username}` : truncateAddress(part.address)) : 'Available',
+          round: part ? round.toString() : '-',
+        };
       });
 
-      const sortedParts = parts.sort((a, b) => parseInt(a.number) - parseInt(b.number));
-      setParticipants(sortedParts);
-      localStorage.setItem(CACHE_KEY(round), JSON.stringify(sortedParts)); // Cache
+      setParticipants(fullList);
+      localStorage.setItem(CACHE_KEY(round), JSON.stringify(fullList)); // Cache
       setError(null);
     } catch (err) {
       console.error('Error fetching participants:', err);
@@ -92,16 +67,6 @@ export function ParticipantsTab() {
   }, [contractAddress, rpcUrl]);
 
   const truncateAddress = (addr: string) => addr.slice(0, 6) + '...' + addr.slice(-4);
-
-  const fullList = Array.from({ length: 100 }, (_, i) => {
-    const num = i.toString().padStart(2, '0');
-    const part = participants.find(p => p.number === num);
-    return {
-      number: num,
-      user: part ? part.user : 'Available',
-      round: part ? part.round : '-',
-    };
-  });
 
   return (
     <div className="mx-4 overflow-x-auto">
@@ -123,7 +88,7 @@ export function ParticipantsTab() {
           </tr>
         </thead>
         <tbody>
-          {fullList.map((item, index) => (
+          {participants.map((item, index) => (
             <tr key={index} className={`${index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : ''} hover:bg-gray-200 dark:hover:bg-gray-600`}>
               <td className="px-4 py-2 border-b text-center font-bold">{item.number}</td>
               <td className="px-4 py-2 border-b text-center">{item.user}</td>

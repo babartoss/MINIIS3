@@ -22,12 +22,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const sendNotification = neynarEnabled ? sendNeynarMiniAppNotification : sendMiniAppNotification;
-  const sendResult = await sendNotification({
-    fid: requestBody.data.fid,
-    title: requestBody.data.title,
-    body: requestBody.data.body,
-  });
+  let sendResult;
+
+  if (neynarEnabled) {
+    sendResult = await sendNeynarMiniAppNotification({
+      fids: [requestBody.data.fid],
+      title: requestBody.data.title,
+      body: requestBody.data.body,
+    });
+  } else {
+    sendResult = await sendMiniAppNotification({
+      fid: requestBody.data.fid,
+      title: requestBody.data.title,
+      body: requestBody.data.body,
+    });
+  }
 
   if (sendResult.state === "error") {
     return Response.json(

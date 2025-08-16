@@ -1,3 +1,4 @@
+// src/lib/kv.ts
 import { Redis } from '@upstash/redis';
 
 const redis = Redis.fromEnv();
@@ -42,4 +43,27 @@ export async function setUserInfo(fid: number, info: { username: string; display
 export async function getUserInfo(fid: number) {
   const data = await redis.get(`${PREFIX}user_info:${fid}`);
   return data ? JSON.parse(data as string) : null;
+}
+
+// New: Set participant for a round
+export async function setParticipant(round: number, number: number, data: { address: string; fid?: number; username?: string; display_name?: string }) {
+  const key = `${PREFIX}participants:${round}`;
+  await redis.hset(key, { [number.toString()]: JSON.stringify(data) });
+}
+
+// New: Get all participants for a round
+export async function getParticipants(round: number): Promise<{ [number: string]: { address: string; fid?: number; username?: string; display_name?: string } }> {
+  const key = `${PREFIX}participants:${round}`;
+  const rawData = await redis.hgetall(key);
+  const participants: { [number: string]: { address: string; fid?: number; username?: string; display_name?: string } } = {};
+  for (const [num, json] of Object.entries(rawData || {})) {
+    participants[num] = JSON.parse(json as string);
+  }
+  return participants;
+}
+
+// New: Delete participants for a round (reset)
+export async function deleteParticipants(round: number) {
+  const key = `${PREFIX}participants:${round}`;
+  await redis.del(key);
 }

@@ -145,7 +145,7 @@ const Board: React.FC = () => {
     }
   }, [approveReceipt.isSuccess, approveReceipt.isError, selectedNumber, selectNumAsync, approveReceipt.error]);
 
-  // Handle after select success: show share, send notification to user
+  // Handle after select success: show share, send notification to user, update participant in Redis
   useEffect(() => {
     if (selectReceipt.isSuccess) {
       console.log('Select successful');
@@ -171,12 +171,32 @@ const Board: React.FC = () => {
           })
           .catch(err => console.error('Error sending notification:', err));
       }
+
+      // New: Update participant in Redis
+      if (userAddress && selectedNumber !== null && fid) {
+        fetch('/api/update-participant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            round: currentRound,
+            number: selectedNumber,
+            address: userAddress,
+            fid,
+          }),
+        })
+          .then(response => {
+            if (!response.ok) {
+              console.error('Failed to update participant');
+            }
+          })
+          .catch(err => console.error('Error updating participant:', err));
+      }
     }
     if (selectReceipt.isError) {
       setErrorMessage(`Select failed: ${selectReceipt.error?.message || 'Unknown error'}`);
       setIsProcessing(false);
     }
-  }, [selectReceipt.isSuccess, selectReceipt.isError, fid, selectedNumber, currentRound, selectHash, selectReceipt.error]);
+  }, [selectReceipt.isSuccess, selectReceipt.isError, fid, selectedNumber, currentRound, selectHash, selectReceipt.error, userAddress]);
 
   const handleSelect = (num: string) => {
     if (!isConnected || isBetClosed || isRoundClosed || isProcessing) return;
