@@ -57,7 +57,14 @@ export async function getParticipants(round: number): Promise<{ [number: string]
   const rawData = await redis.hgetall(key);
   const participants: { [number: string]: { address: string; fid?: number; username?: string; display_name?: string } } = {};
   for (const [num, json] of Object.entries(rawData || {})) {
-    participants[num] = JSON.parse(json as string);
+    if (typeof json === 'string') {
+      try {
+        participants[num] = JSON.parse(json);
+      } catch (e) {
+        console.error(`Failed to parse participant data for ${num}:`, e);
+        // Skip invalid entry
+      }
+    }
   }
   return participants;
 }
