@@ -1,9 +1,9 @@
-// src/app/api/auto-round/route.ts
+// File: miniis3\src\app\api\auto-round\route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import axios from "axios";
 import { sendNeynarMiniAppNotification } from "~/lib/neynar";
-import { getFidByAddress, getAllUserFids, deleteParticipants } from "~/lib/kv";
+import { getFidByAddress, getAllUserFids } from "~/lib/kv";
 import { sendMiniAppNotification } from "~/lib/notifs";
 
 // ABI đầy đủ từ contract
@@ -74,17 +74,17 @@ const ABI = [
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"},{"internalType": "address", "name": "", "type": "address"}],
-    "name": "claimed",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [{"internalType": "uint256", "name": "round", "type": "uint256"}],
     "name": "claimReward",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}, {"internalType": "address", "name": "", "type": "address"}],
+    "name": "claimed",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -109,7 +109,7 @@ const ABI = [
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "round", "type": "uint256"},{"internalType": "address", "name": "user", "type": "address"}],
+    "inputs": [{"internalType": "uint256", "name": "round", "type": "uint256"}, {"internalType": "address", "name": "user", "type": "address"}],
     "name": "hasClaimed",
     "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
     "stateMutability": "view",
@@ -165,7 +165,7 @@ const ABI = [
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"},{"internalType": "uint8", "name": "", "type": "uint8"}],
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}, {"internalType": "uint8", "name": "", "type": "uint8"}],
     "name": "selectedNumbers",
     "outputs": [{"internalType": "address", "name": "", "type": "address"}],
     "stateMutability": "view",
@@ -214,45 +214,101 @@ const ABI = [
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"},{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "name": "winningNumbers",
-    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [{"internalType": "uint256", "name": "amount", "type": "uint256"}],
     "name": "withdrawReward",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}, {"internalType": "uint256", "name": "", "type": "uint256"}],
+    "name": "winningNumbers",
+    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+    "stateMutability": "view",
+    "type": "function"
   }
 ];
 
-const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '';
-const rpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
-const privateKey = process.env.PRIVATE_KEY || '';
-const neynarEnabled = process.env.NEYNAR_API_KEY && process.env.NEYNAR_CLIENT_ID;
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
+const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY!;
+const RPC_URL = process.env.NEXT_PUBLIC_BASE_RPC_URL!;
+const neynarEnabled = !!process.env.NEYNAR_API_KEY && !!process.env.NEYNAR_CLIENT_ID;
 
-export async function POST(request: NextRequest) {
+async function fetchWinningNumbers(): Promise<number[]> {
+  let attempts = 0;
+  const maxAttempts = 5;
+  while (attempts < maxAttempts) {
+    try {
+      const response = await axios.get('https://xoso188.net/api/front/open/lottery/history/list/5/miba');
+      const apiData = response.data;
+      if (apiData.success && apiData.t.issueList && apiData.t.issueList.length > 0) {
+        const latest = apiData.t.issueList[0];
+        const detailArray = JSON.parse(latest.detail);
+        const db = detailArray[0]; // Giải đặc biệt, e.g., "12421"
+        const g7Str = detailArray[detailArray.length - 1]; // G7, e.g., "35,90,96,06"
+        const g7 = g7Str.split(',').map((n: string) => parseInt(n.trim(), 10));
+        if (g7.length !== 4) {
+          throw new Error('Invalid G7 length');
+        }
+        const dbLast2 = parseInt(db.slice(-2), 10);
+        const winners = [dbLast2, ...g7];
+        if (winners.length === 5 && winners.every((n: number) => !isNaN(n) && n >= 0 && n <= 99)) {
+          return winners;
+        }
+      }
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error) {
+      console.error('Fetch error:', error);
+      attempts++;
+    }
+  }
+  return [];
+}
+
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Skip if before result time (e.g., 12:30 UTC)
+  const now = new Date();
+  if (now.getUTCHours() < 12 || (now.getUTCHours() === 12 && now.getUTCMinutes() < 30)) {
+    console.log('Too early for auto-round');
+    return NextResponse.json({ success: false, message: 'Too early' }, { status: 200 });
+  }
+
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const wallet = new ethers.Wallet(privateKey, provider);
-    const contract = new ethers.Contract(contractAddress, ABI, wallet);
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    const wallet = new ethers.Wallet(OWNER_PRIVATE_KEY, provider);
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
     const currentRound = Number(await contract.currentRound());
     const isClosed = await contract.roundClosed(currentRound);
 
-    let winners: number[] = [];
     if (!isClosed) {
-      const response = await axios.get('https://www.minhngoc.net.vn/getkqxs/mien-bac.json');
-      const data = response.data;
-      if (!data.mienbac || !data.mienbac.giaidb) {
-        throw new Error('Invalid lottery data');
-      }
-      winners = data.mienbac.giaidb.slice(-2).map(Number);
+      const winners = await fetchWinningNumbers();
       if (winners.length !== 5) {
-        return NextResponse.json({ error: 'Not enough winning numbers from previous round' }, { status: 200 });
+        console.error('Failed to fetch valid winners after retries');
+        return NextResponse.json({ success: false, message: 'Invalid winners data after retries' }, { status: 500 });
+      }
+      const isAllZero = winners.every(n => n === 0);
+      if (isAllZero) {
+        console.error('Winners all zero - invalid, skipping set');
+        return NextResponse.json({ success: false, message: 'Invalid all-zero winners' }, { status: 200 });
+      }
+
+      if (currentRound > 1) {
+        const prevWinners: number[] = [];
+        for (let i = 0; i < 5; i++) {
+          prevWinners.push(Number(await contract.winningNumbers(currentRound - 1, i)));
+        }
+        const isSameAsPrev = winners.every((num, idx) => num === prevWinners[idx]);
+        if (isSameAsPrev) {
+          console.log(`Winners for round ${currentRound} same as round ${currentRound - 1}, skipping set`);
+          return NextResponse.json({ success: false, message: 'Winners identical to previous round' }, { status: 200 });
+        }
       }
 
       const txSet = await contract.setWinningNumbers(winners);
@@ -290,9 +346,6 @@ export async function POST(request: NextRequest) {
     const txStart = await contract.startNewRound();
     await txStart.wait();
     console.log('New round started');
-
-    // New: Reset participants in Redis for the previous round
-    await deleteParticipants(currentRound); // Delete old round's participants
 
     // Tích hợp gửi thông báo vòng chơi mới (broadcast)
     const title = 'New Round Started!';

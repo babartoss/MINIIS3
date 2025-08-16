@@ -28,7 +28,7 @@ async function setWinnersForRound(round, winners) {
 async function main() {
   // Chạy cho round 6
   // THAY ĐỔI: Thay winners thực tế cho round 6 (kết quả XSMB ngày 09/08/2025, ví dụ: [23, 45, 67, 89, 12])
-  await setWinnersForRound(13, [60, 17, 27, 98, 16]);
+  await setWinnersForRound(15, [48, 83, 80, 93, 94]);
 
   // Chạy cho round 5
   // THAY ĐỔI: Thay winners thực tế cho round 5 (kết quả XSMB ngày 08/08/2025, ví dụ: [15, 27, 33, 41, 58])
