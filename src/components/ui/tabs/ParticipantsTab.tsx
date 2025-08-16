@@ -64,6 +64,13 @@ export function ParticipantsTab() {
 
   useEffect(() => {
     fetchParticipants(); // Fetch ban đầu khi mount (dùng cache nếu có)
+
+    // Thêm polling để tự động làm mới khi vòng mới bắt đầu (kiểm tra mỗi 30 giây)
+    const interval = setInterval(() => {
+      fetchParticipants(true); // Force refresh để đồng bộ với auto-round
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [contractAddress, rpcUrl]);
 
   const truncateAddress = (addr: string) => addr.slice(0, 6) + '...' + addr.slice(-4);

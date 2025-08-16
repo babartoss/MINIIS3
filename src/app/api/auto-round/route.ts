@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import axios from "axios";
 import { sendNeynarMiniAppNotification } from "~/lib/neynar";
-import { getFidByAddress, getAllUserFids } from "~/lib/kv";
+import { getFidByAddress, getAllUserFids, deleteParticipants } from "~/lib/kv";
 import { sendMiniAppNotification } from "~/lib/notifs";
 
 // ABI đầy đủ từ contract
@@ -172,21 +172,7 @@ const ABI = [
     "type": "function"
   },
   {
-    "inputs": [{"internalType": "uint256", "name": "newAmount", "type": "uint256"}],
-    "name": "setBetAmount",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "newReward", "type": "uint256"}],
-    "name": "setRewardPerMatch",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint8[5]", "name": "_winners", "type": "uint8[5]"}],
+    "inputs": [{"internalType": "uint8[5]", "name": "winners", "type": "uint8[5]"}],
     "name": "setWinningNumbers",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -202,6 +188,20 @@ const ABI = [
   {
     "inputs": [{"internalType": "address", "name": "newOwner", "type": "address"}],
     "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "newAmount", "type": "uint256"}],
+    "name": "updateBetAmount",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "newReward", "type": "uint256"}],
+    "name": "updateRewardPerMatch",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -229,17 +229,17 @@ const ABI = [
   }
 ];
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
+const RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY!;
-const RPC_URL = process.env.NEXT_PUBLIC_BASE_RPC_URL!;
-const neynarEnabled = !!process.env.NEYNAR_API_KEY && !!process.env.NEYNAR_CLIENT_ID;
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS!;
+
+const neynarEnabled = process.env.NEYNAR_API_KEY ? true : false;
 
 async function fetchWinningNumbers(): Promise<number[]> {
   let attempts = 0;
-  const maxAttempts = 5;
-  while (attempts < maxAttempts) {
+  while (attempts < 5) {
     try {
-      const response = await axios.get('https://xoso188.net/api/front/open/lottery/history/list/5/miba');
+      const response = await axios.get('https://api.kqxsso188.net/api/front/open/lottery/history/list/5/miba');
       const apiData = response.data;
       if (apiData.success && apiData.t.issueList && apiData.t.issueList.length > 0) {
         const latest = apiData.t.issueList[0];
@@ -341,6 +341,9 @@ export async function GET(request: NextRequest) {
           console.log(`No FID for address ${addr}`);
         }
       }
+
+      // Reset danh sách người chơi cho vòng hiện tại (vòng vừa kết thúc) để làm sạch Redis
+      await deleteParticipants(currentRound);
     }
 
     const txStart = await contract.startNewRound();
